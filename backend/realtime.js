@@ -6,6 +6,56 @@ const db = require("./db");
 const driverSockets = new Map();
 // rideId -> Set<WebSocket>
 const rideSubscribers = new Map();
+// rideId -> Timeout (cuenta regresiva de "chofer desconectado" -> "chofer perdido")
+const disconnectTimers = new Map();
+
+// Ventana de gracia antes de avisarle al pasajero que el chofer no vuelve.
+// Cubre un parpadeo normal de señal (el chofer reconecta solo, en ~2s) sin
+// alarmar al pasajero de más; si pasa esto, algo de verdad se cayó.
+const DISCONNECT_GRACE_MS = 20000;
+
+function activeRideForDriver(driverId) {
+  return db
+    .prepare(
+      "SELECT id, driver_disconnected_at FROM rides WHERE driver_id = ? AND status IN ('aceptado', 'llegue', 'en_curso')"
+    )
+    .get(driverId);
+}
+
+function handleDriverDisconnected(driverId) {
+  const ride = activeRideForDriver(driverId);
+  if (!ride) return;
+
+  db.prepare("UPDATE rides SET driver_disconnected_at = datetime('now') WHERE id = ?").run(ride.id);
+  notifyRide(ride.id, "driver_disconnected", {});
+
+  const timer = setTimeout(() => {
+    disconnectTimers.delete(ride.id);
+    const current = db
+      .prepare("SELECT status, driver_disconnected_at FROM rides WHERE id = ?")
+      .get(ride.id);
+    const stillStuck =
+      current &&
+      ["aceptado", "llegue", "en_curso"].includes(current.status) &&
+      current.driver_disconnected_at &&
+      !driverSockets.has(driverId);
+    if (stillStuck) notifyRide(ride.id, "driver_lost", {});
+  }, DISCONNECT_GRACE_MS);
+  disconnectTimers.set(ride.id, timer);
+}
+
+function handleDriverReconnected(driverId) {
+  const ride = activeRideForDriver(driverId);
+  if (!ride || !ride.driver_disconnected_at) return;
+
+  db.prepare("UPDATE rides SET driver_disconnected_at = NULL WHERE id = ?").run(ride.id);
+  const timer = disconnectTimers.get(ride.id);
+  if (timer) {
+    clearTimeout(timer);
+    disconnectTimers.delete(ride.id);
+  }
+  notifyRide(ride.id, "driver_reconnected", {});
+}
 
 function attach(httpServer) {
   const wss = new WebSocketServer({ server: httpServer, path: "/ws" });
@@ -29,6 +79,7 @@ function attach(httpServer) {
       }
 
       driverSockets.set(driverId, ws);
+      handleDriverReconnected(driverId);
 
       ws.on("message", (raw) => {
         let msg;
@@ -66,6 +117,7 @@ function attach(httpServer) {
           db.prepare(
             "UPDATE drivers SET status = 'offline' WHERE id = ?"
           ).run(driverId);
+          handleDriverDisconnected(driverId);
         }
       });
       return;
@@ -133,6 +185,14 @@ function notifyDriver(driverId, type, payload) {
   if (ws) send(ws, type, payload);
 }
 
+function clearDisconnectTimer(rideId) {
+  const timer = disconnectTimers.get(rideId);
+  if (timer) {
+    clearTimeout(timer);
+    disconnectTimers.delete(rideId);
+  }
+}
+
 module.exports = {
   attach,
   notifyRide,
@@ -140,4 +200,5 @@ module.exports = {
   broadcastRideTaken,
   broadcastRideRemoved,
   notifyDriver,
+  clearDisconnectTimer,
 };

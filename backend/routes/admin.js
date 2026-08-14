@@ -101,7 +101,8 @@ router.post("/admin/rides/list", checkAdminPin, (req, res) => {
   const rides = db
     .prepare(
       `SELECT r.id, r.rider_name, r.rider_phone, r.pickup_label, r.dest_label,
-              r.passengers, r.status, r.created_at, r.updated_at, d.name AS driver_name
+              r.passengers, r.status, r.created_at, r.updated_at, r.driver_disconnected_at,
+              d.name AS driver_name
        FROM rides r
        LEFT JOIN drivers d ON d.id = r.driver_id
        ORDER BY r.updated_at DESC

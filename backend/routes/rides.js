@@ -163,8 +163,9 @@ router.post("/rides/:id/cancel", (req, res) => {
   if (!ride) return res.status(404).json({ error: "Viaje no encontrado" });
 
   db.prepare(
-    "UPDATE rides SET status = 'cancelado', updated_at = datetime('now') WHERE id = ?"
+    "UPDATE rides SET status = 'cancelado', updated_at = datetime('now'), driver_disconnected_at = NULL WHERE id = ?"
   ).run(rideId);
+  realtime.clearDisconnectTimer(rideId);
 
   if (ride.driver_id) {
     db.prepare("UPDATE drivers SET status = 'disponible' WHERE id = ?").run(

@@ -61,4 +61,10 @@ try {
   // la columna ya existe
 }
 
+try {
+  db.exec("ALTER TABLE rides ADD COLUMN driver_disconnected_at TEXT");
+} catch {
+  // la columna ya existe
+}
+
 module.exports = db;
