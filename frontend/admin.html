@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MotoYaTekax Admin</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%9B%B5%3C/text%3E%3C/svg%3E" />
+<link rel="stylesheet" href="style.css" />
+<style>
+  .screen { display: none; flex-direction: column; min-height: 100vh; }
+  .screen.active { display: flex; }
+  #login { align-items: center; justify-content: center; gap: 14px; padding: 24px; text-align: center; }
+  #login input { width: 200px; text-align: center; letter-spacing: 4px; }
+  #err { color: var(--danger); min-height: 18px; font-size: 14px; }
+  #app { padding: 28px 20px 60px; max-width: 680px; margin: 0 auto; width: 100%; }
+  #app h1 { color: var(--accent); font-size: 22px; margin: 0 0 4px; }
+  #app .section-hint { color: var(--text-dim); font-size: 14px; margin: 0 0 18px; }
+  .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+  .field label { font-size: 13px; color: var(--text-dim); }
+  #err2 { color: var(--danger); min-height: 18px; font-size: 14px; margin-top: 6px; }
+  #newPinCard { display: none; padding: 20px; margin: 18px 0; text-align: center; }
+  #newPinCard .pin { font-size: 42px; font-weight: 800; color: var(--accent); letter-spacing: 6px; margin: 10px 0; }
+  #newPinCard .sub { color: var(--text-dim); font-size: 13px; margin-bottom: 14px; }
+  .table-wrap { overflow-x: auto; border-radius: var(--radius-md); }
+  .paidRow { display: flex; gap: 6px; align-items: center; }
+  .paidRow input[type="date"] { padding: 7px 8px; font-size: 13px; background: var(--bg-card); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius-sm); }
+  .vencido { color: var(--danger); font-size: 12px; margin-top: 3px; }
+  .al-corriente { color: var(--success); font-size: 12px; margin-top: 3px; }
+  .phoneRow { display: flex; gap: 8px; align-items: center; }
+  .phoneRow .prefix { padding: 13px 10px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-dim); font-size: 16px; }
+  .phoneRow input { flex: 1; }
+  .row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+  section + h1 { margin-top: 32px; }
+</style>
+</head>
+<body>
+
+<div id="login" class="screen active">
+  <div class="brand"><span class="brand-icon">🛵</span>MotoYaTekax Admin</div>
+  <input id="adminPin" inputmode="numeric" placeholder="PIN de admin" />
+  <button class="btn" onclick="login()">Entrar</button>
+  <div id="err"></div>
+</div>
+
+<div id="app" class="screen">
+  <h1>Dar de alta un chofer</h1>
+  <p class="section-hint">Genera su PIN y envíaselo directo por WhatsApp.</p>
+  <div class="field">
+    <label>Nombre</label>
+    <input id="driverName" placeholder="Nombre del chofer" />
+  </div>
+  <div class="field">
+    <label>Teléfono (WhatsApp)</label>
+    <div class="phoneRow">
+      <span class="prefix">+52</span>
+      <input id="driverPhone" placeholder="10 dígitos" inputmode="numeric" maxlength="10" oninput="this.value = this.value.replace(/\D/g, '')" />
+    </div>
+  </div>
+  <div class="field">
+    <label>Vehículo (opcional)</label>
+    <input id="driverVehicle" placeholder="Ej. Mototaxi rojo, placa ABC123" />
+  </div>
+  <button class="btn" onclick="registerDriver()">Registrar chofer</button>
+  <div id="err2"></div>
+
+  <div id="newPinCard" class="card fade-in">
+    <div>PIN para <strong id="newDriverName"></strong></div>
+    <div class="pin" id="newPin"></div>
+    <div class="sub">Compártele este PIN para que entre en chofer.html</div>
+    <button class="btn btn-sm wa" style="padding:12px 20px;font-size:15px;" onclick="sendLastWhatsapp()">Enviar por WhatsApp</button>
+  </div>
+
+  <h1>Choferes registrados</h1>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Nombre</th><th>PIN</th><th>Teléfono</th><th>Estado</th><th>Inscrito</th><th>Vigente hasta</th><th></th></tr>
+      </thead>
+      <tbody id="driverRows"></tbody>
+    </table>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+const API = "";
+let adminPin = null;
+let driversCache = [];
+let lastRegistered = null;
+let editingId = null;
+
+function showToast(msg) {
+  const el = document.getElementById("toast");
+  el.textContent = msg;
+  el.classList.add("show");
+  clearTimeout(showToast._t);
+  showToast._t = setTimeout(() => el.classList.remove("show"), 3200);
+}
+
+function waLink(phone, text) {
+  const digits = phone.replace(/\D/g, "");
+  return `https://api.whatsapp.com/send?phone=52${digits}&text=${encodeURIComponent(text)}`;
+}
+
+function welcomeMessage(driver) {
+  const link = `${location.origin}/chofer.html`;
+  return `¡Hola ${driver.name}! Gracias por tu confianza en MotoYaTekax.\n\nTu PIN de acceso de chofer es: ${driver.pin}\nEntra aquí para empezar a recibir viajes: ${link}`;
+}
+
+function sendLastWhatsapp() {
+  if (!lastRegistered) return;
+  window.open(waLink(lastRegistered.phone, welcomeMessage(lastRegistered)), "_blank");
+}
+
+function sendWhatsappFor(id) {
+  const driver = driversCache.find((d) => d.id === id);
+  if (!driver) return;
+  window.open(waLink(driver.phone, welcomeMessage(driver)), "_blank");
+}
+
+async function login() {
+  adminPin = document.getElementById("adminPin").value.trim();
+  document.getElementById("err").textContent = "";
+  const res = await fetch(API + "/api/admin/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ adminPin }),
+  });
+  if (!res.ok) {
+    document.getElementById("err").textContent = "PIN incorrecto";
+    return;
+  }
+  document.getElementById("login").classList.remove("active");
+  document.getElementById("app").classList.add("active");
+  loadDrivers();
+}
+
+async function registerDriver() {
+  const name = document.getElementById("driverName").value.trim();
+  const phone = document.getElementById("driverPhone").value.trim();
+  const vehicle = document.getElementById("driverVehicle").value.trim();
+  document.getElementById("err2").textContent = "";
+
+  if (!name || !phone) {
+    document.getElementById("err2").textContent = "Escribe nombre y teléfono";
+    return;
+  }
+
+  const res = await fetch(API + "/api/admin/drivers", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ adminPin, name, phone, vehicle }),
+  });
+  if (!res.ok) {
+    document.getElementById("err2").textContent = (await res.json()).error;
+    return;
+  }
+  const driver = await res.json();
+  lastRegistered = driver;
+
+  document.getElementById("newDriverName").textContent = driver.name;
+  document.getElementById("newPin").textContent = driver.pin;
+  document.getElementById("newPinCard").style.display = "block";
+
+  document.getElementById("driverName").value = "";
+  document.getElementById("driverPhone").value = "";
+  document.getElementById("driverVehicle").value = "";
+
+  loadDrivers();
+}
+
+async function loadDrivers() {
+  const res = await fetch(API + "/api/admin/drivers/list", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ adminPin }),
+  });
+  driversCache = await res.json();
+  renderDriverRows();
+}
+
+function startEdit(id) {
+  editingId = id;
+  renderDriverRows();
+}
+
+function cancelEdit() {
+  editingId = null;
+  renderDriverRows();
+}
+
+async function saveEdit(id) {
+  const name = document.getElementById(`edit-name-${id}`).value.trim();
+  const phone = document.getElementById(`edit-phone-${id}`).value.trim();
+  const vehicle = document.getElementById(`edit-vehicle-${id}`).value.trim();
+  if (!name || !phone) {
+    showToast("Escribe nombre y teléfono");
+    return;
+  }
+  await fetch(API + `/api/admin/drivers/${id}/update`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ adminPin, name, phone, vehicle }),
+  });
+  editingId = null;
+  loadDrivers();
+}
+
+async function deleteDriver(id, name) {
+  if (!confirm(`¿Eliminar a ${name}? Esta acción no se puede deshacer.`)) return;
+  await fetch(API + `/api/admin/drivers/${id}/delete`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ adminPin }),
+  });
+  loadDrivers();
+}
+
+function renderDriverRows() {
+  document.getElementById("driverRows").innerHTML = driversCache.map((d) => {
+    if (editingId === d.id) {
+      return `
+      <tr>
+        <td><input id="edit-name-${d.id}" value="${d.name}" /></td>
+        <td>${d.pin}</td>
+        <td>
+          <div class="phoneRow">
+            <span class="prefix">+52</span>
+            <input id="edit-phone-${d.id}" value="${d.phone}" inputmode="numeric" maxlength="10" oninput="this.value = this.value.replace(/\\D/g, '')" />
+          </div>
+        </td>
+        <td><span class="dot ${d.status}"></span>${d.status}</td>
+        <td>${d.created_at ? d.created_at.slice(0, 10) : ""}</td>
+        <td><input id="edit-vehicle-${d.id}" value="${d.vehicle || ""}" placeholder="Vehículo" /></td>
+        <td class="row-actions">
+          <button class="btn-sm" onclick="saveEdit(${d.id})">Guardar</button>
+          <button class="btn-sm" onclick="cancelEdit()">Cancelar</button>
+        </td>
+      </tr>`;
+    }
+
+    const today = new Date().toISOString().slice(0, 10);
+    const vencido = d.paid_until && d.paid_until < today;
+    const statusLabel = d.paid_until
+      ? `<div class="${vencido ? "vencido" : "al-corriente"}">${vencido ? "vencido" : "al corriente"}</div>`
+      : "";
+    return `
+    <tr>
+      <td>${d.name}</td>
+      <td>${d.pin}</td>
+      <td>${d.phone}</td>
+      <td><span class="dot ${d.status}"></span>${d.status}</td>
+      <td>${d.created_at ? d.created_at.slice(0, 10) : ""}</td>
+      <td>
+        <div class="paidRow">
+          <input type="date" id="paid-${d.id}" value="${d.paid_until || ""}" />
+          <button class="btn-sm" onclick="savePaidUntil(${d.id})">Guardar</button>
+        </div>
+        ${statusLabel}
+      </td>
+      <td class="row-actions">
+        <button class="btn-sm wa" onclick="sendWhatsappFor(${d.id})">WhatsApp</button>
+        <button class="btn-sm" onclick="startEdit(${d.id})">Editar</button>
+        <button class="btn-sm danger" onclick="deleteDriver(${d.id}, '${d.name.replace(/'/g, "\\'")}')">Eliminar</button>
+      </td>
+    </tr>`;
+  }).join("");
+}
+
+async function savePaidUntil(id) {
+  const paidUntil = document.getElementById(`paid-${id}`).value;
+  await fetch(API + `/api/admin/drivers/${id}/paid-until`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ adminPin, paidUntil }),
+  });
+  loadDrivers();
+}
+</script>
+</body>
+</html>
