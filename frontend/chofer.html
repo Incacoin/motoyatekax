@@ -49,9 +49,12 @@
       <div class="name" id="driverName"></div>
       <div id="statusText" style="font-size:13px;color:var(--text-dim);">Desconectado</div>
     </div>
-    <div id="toggle">
-      <span>Disponible</span>
-      <div id="switch" onclick="toggleAvailable()"><div class="knob"></div></div>
+    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
+      <div id="toggle">
+        <span>Disponible</span>
+        <div id="switch" onclick="toggleAvailable()"><div class="knob"></div></div>
+      </div>
+      <button onclick="logout()" style="background:none;border:none;color:var(--text-faint);font-size:12px;cursor:pointer;padding:0;">Cerrar sesión</button>
     </div>
   </div>
   <div id="map"></div>
@@ -107,6 +110,16 @@ async function login() {
   } catch (e) {
     document.getElementById("loginError").textContent = e.message;
   }
+}
+
+function logout() {
+  if (currentRide) {
+    showToast("No puedes cerrar sesión con un viaje activo");
+    return;
+  }
+  if (ws) { ws.onclose = null; ws.close(); }
+  localStorage.removeItem("motoya_driver");
+  location.reload();
 }
 
 function startApp() {
