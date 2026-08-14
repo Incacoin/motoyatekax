@@ -123,12 +123,23 @@ function startApp() {
 function connectWs() {
   const proto = location.protocol === "https:" ? "wss" : "ws";
   ws = new WebSocket(`${proto}://${location.host}/ws?role=driver&driverId=${driver.id}`);
+  let pingInterval;
+  ws.onopen = () => {
+    if (available) ws.send(JSON.stringify({ type: "status", status: "disponible" }));
+    if (myPos) ws.send(JSON.stringify({ type: "location", lat: myPos.lat, lng: myPos.lng }));
+    pingInterval = setInterval(() => {
+      if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "ping" }));
+    }, 25000);
+  };
   ws.onmessage = (ev) => {
     const { type, payload } = JSON.parse(ev.data);
     if (type === "new_ride") addPendingRide(payload);
     if (type === "ride_taken") removePendingRide(payload.rideId);
   };
-  ws.onclose = () => setTimeout(connectWs, 2000);
+  ws.onclose = () => {
+    clearInterval(pingInterval);
+    setTimeout(connectWs, 2000);
+  };
 }
 
 function watchLocation() {

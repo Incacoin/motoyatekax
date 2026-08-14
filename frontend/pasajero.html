@@ -68,6 +68,7 @@ let pickup = null, dest = null;
 let pickupMarker = null, destMarker = null;
 let ride = null, ws = null;
 let driverMarker = null;
+let currentRideStatus = "buscando";
 
 function goToMap() {
   const name = document.getElementById("nameInput").value.trim();
@@ -156,12 +157,24 @@ async function requestRide() {
 function connectWs() {
   const proto = location.protocol === "https:" ? "wss" : "ws";
   ws = new WebSocket(`${proto}://${location.host}/ws?role=rider&rideId=${ride.id}`);
+  let pingInterval;
+  ws.onopen = () => {
+    pingInterval = setInterval(() => {
+      if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "ping" }));
+    }, 25000);
+  };
   ws.onmessage = (ev) => {
     const { type, payload } = JSON.parse(ev.data);
     if (type === "ride_accepted") onDriverAssigned(payload);
     if (type === "driver_location") onDriverLocation(payload);
     if (type === "status_change" && payload.status === "completado") onCompleted();
     if (type === "status_change" && payload.status === "cancelado") onCancelledByDriver();
+  };
+  ws.onclose = () => {
+    clearInterval(pingInterval);
+    if (ride && !["completado", "cancelado"].includes(currentRideStatus)) {
+      setTimeout(connectWs, 2000);
+    }
   };
 }
 
@@ -188,6 +201,7 @@ function onDriverLocation({ lat, lng }) {
 }
 
 function onCompleted() {
+  currentRideStatus = "completado";
   document.getElementById("statusText").textContent = "Viaje completado. ¡Gracias por usar MotoYaTekax!";
   document.getElementById("driverCard").style.display = "none";
   document.getElementById("cancelBtn").style.display = "none";
@@ -195,6 +209,7 @@ function onCompleted() {
 }
 
 function onCancelledByDriver() {
+  currentRideStatus = "cancelado";
   document.getElementById("statusText").textContent = "El viaje fue cancelado.";
   document.getElementById("cancelBtn").style.display = "none";
   document.getElementById("newRideBtn").style.display = "inline-block";
@@ -202,6 +217,7 @@ function onCancelledByDriver() {
 
 async function cancelRide() {
   if (!ride) return;
+  currentRideStatus = "cancelado";
   await fetch(API + `/api/rides/${ride.id}/cancel`, { method: "POST" });
   document.getElementById("statusText").textContent = "Viaje cancelado.";
   document.getElementById("cancelBtn").style.display = "none";
