@@ -68,6 +68,7 @@ const API = "";
 let driver = null;
 let ws = null;
 let map, myMarker, routeLine;
+let currentPickupMarker = null, currentDestMarker = null;
 const pickupMarkers = {};
 let pendingRides = {};
 let currentRide = null;
@@ -295,9 +296,9 @@ async function acceptRide(id) {
   for (const m of Object.values(pickupMarkers)) map.removeLayer(m);
   Object.keys(pickupMarkers).forEach((k) => delete pickupMarkers[k]);
 
-  L.circleMarker([currentRide.pickup_lat, currentRide.pickup_lng], { color: "#f6a623", radius: 8 }).addTo(map);
+  currentPickupMarker = L.circleMarker([currentRide.pickup_lat, currentRide.pickup_lng], { color: "#f6a623", radius: 8 }).addTo(map);
   if (currentRide.dest_lat) {
-    L.circleMarker([currentRide.dest_lat, currentRide.dest_lng], { color: "#3498db", radius: 8 }).addTo(map);
+    currentDestMarker = L.circleMarker([currentRide.dest_lat, currentRide.dest_lng], { color: "#3498db", radius: 8 }).addTo(map);
   }
   updateRouteLine();
   routeRefreshInterval = setInterval(updateRouteLine, 15000);
@@ -307,6 +308,8 @@ async function acceptRide(id) {
 function stopRouteTracking() {
   clearInterval(routeRefreshInterval);
   if (routeLine) { map.removeLayer(routeLine); routeLine = null; }
+  if (currentPickupMarker) { map.removeLayer(currentPickupMarker); currentPickupMarker = null; }
+  if (currentDestMarker) { map.removeLayer(currentDestMarker); currentDestMarker = null; }
 }
 
 async function completeRide() {
