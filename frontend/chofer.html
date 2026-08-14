@@ -132,6 +132,7 @@ function logout() {
     return;
   }
   if (ws) { ws.onclose = null; ws.close(); }
+  releaseWakeLock();
   localStorage.removeItem("motoya_driver");
   location.reload();
 }
@@ -216,13 +217,67 @@ function toggleAvailable() {
   if (ws && ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify({ type: "status", status: available ? "disponible" : "offline" }));
   }
-  if (!available) {
+  if (available) {
+    primeAudio();
+    requestWakeLock();
+  } else {
     pendingRides = {};
+    releaseWakeLock();
     renderRideList();
   }
 }
 
+let wakeLock = null;
+
+async function requestWakeLock() {
+  if (!("wakeLock" in navigator)) return;
+  try {
+    wakeLock = await navigator.wakeLock.request("screen");
+  } catch (e) {
+    console.warn("wake lock error", e);
+  }
+}
+
+function releaseWakeLock() {
+  if (wakeLock) { wakeLock.release(); wakeLock = null; }
+}
+
+document.addEventListener("visibilitychange", () => {
+  if (available && document.visibilityState === "visible" && !wakeLock) {
+    requestWakeLock();
+  }
+});
+
+let audioCtx = null;
+
+function primeAudio() {
+  if (!audioCtx) {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    audioCtx = new Ctx();
+  }
+  if (audioCtx.state === "suspended") audioCtx.resume();
+}
+
+function playNotificationSound() {
+  if (!audioCtx) return;
+  const now = audioCtx.currentTime;
+  [880, 1320].forEach((freq, i) => {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = "sine";
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0.0001, now + i * 0.15);
+    gain.gain.exponentialRampToValueAtTime(0.35, now + i * 0.15 + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + i * 0.15 + 0.3);
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start(now + i * 0.15);
+    osc.stop(now + i * 0.15 + 0.35);
+  });
+}
+
 function addPendingRide(ride) {
+  playNotificationSound();
   pendingRides[ride.id] = ride;
   const markers = [L.marker([ride.pickup_lat, ride.pickup_lng], { icon: numberedIcon(1, "#f6a623") }).addTo(map)];
   if (ride.dest_lat) {
