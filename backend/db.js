@@ -44,6 +44,18 @@ try {
 }
 
 try {
+  db.exec("ALTER TABLE drivers ADD COLUMN vouched_by TEXT");
+} catch {
+  // la columna ya existe
+}
+
+try {
+  db.exec("ALTER TABLE drivers ADD COLUMN vouched_at TEXT");
+} catch {
+  // la columna ya existe
+}
+
+try {
   db.exec("ALTER TABLE rides ADD COLUMN passengers INTEGER NOT NULL DEFAULT 1");
 } catch {
   // la columna ya existe

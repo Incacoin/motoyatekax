@@ -26,6 +26,10 @@
   .paidRow input[type="date"] { padding: 7px 8px; font-size: 13px; background: var(--bg-card); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius-sm); }
   .vencido { color: var(--danger); font-size: 12px; margin-top: 3px; }
   .al-corriente { color: var(--success); font-size: 12px; margin-top: 3px; }
+  .vouchRow { display: flex; gap: 6px; align-items: center; }
+  .vouchRow input[type="text"] { width: 110px; padding: 7px 8px; font-size: 13px; background: var(--bg-card); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius-sm); }
+  .sin-aval { color: var(--danger); font-size: 12px; margin-top: 3px; }
+  .avalado { color: var(--success); font-size: 12px; margin-top: 3px; }
   .phoneRow { display: flex; gap: 8px; align-items: center; }
   .phoneRow .prefix { padding: 13px 10px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-dim); font-size: 16px; }
   .phoneRow input { flex: 1; }
@@ -74,7 +78,7 @@
   <div class="table-wrap">
     <table>
       <thead>
-        <tr><th>Nombre</th><th>PIN</th><th>Teléfono</th><th>Estado</th><th>Inscrito</th><th>Vigente hasta</th><th></th></tr>
+        <tr><th>Nombre</th><th>PIN</th><th>Teléfono</th><th>Estado</th><th>Inscrito</th><th>Vigente hasta</th><th>Aval sindicato</th><th></th></tr>
       </thead>
       <tbody id="driverRows"></tbody>
     </table>
@@ -233,6 +237,7 @@ function renderDriverRows() {
         <td><span class="dot ${d.status}"></span>${d.status}</td>
         <td>${d.created_at ? d.created_at.slice(0, 10) : ""}</td>
         <td><input id="edit-vehicle-${d.id}" value="${d.vehicle || ""}" placeholder="Vehículo" /></td>
+        <td>${d.vouched_by ? `<div class="avalado">${d.vouched_by}</div>` : `<div class="sin-aval">sin aval</div>`}</td>
         <td class="row-actions">
           <button class="btn-sm" onclick="saveEdit(${d.id})">Guardar</button>
           <button class="btn-sm" onclick="cancelEdit()">Cancelar</button>
@@ -245,6 +250,9 @@ function renderDriverRows() {
     const statusLabel = d.paid_until
       ? `<div class="${vencido ? "vencido" : "al-corriente"}">${vencido ? "vencido" : "al corriente"}</div>`
       : "";
+    const vouchLabel = d.vouched_by
+      ? `<div class="avalado">avalado ${d.vouched_at ? "el " + d.vouched_at : ""}</div>`
+      : `<div class="sin-aval">sin aval</div>`;
     return `
     <tr>
       <td>${d.name}</td>
@@ -258,6 +266,13 @@ function renderDriverRows() {
           <button class="btn-sm" onclick="savePaidUntil(${d.id})">Guardar</button>
         </div>
         ${statusLabel}
+      </td>
+      <td>
+        <div class="vouchRow">
+          <input type="text" id="vouch-${d.id}" value="${d.vouched_by || ""}" placeholder="Nombre del líder" />
+          <button class="btn-sm" onclick="saveVouch(${d.id})">Guardar</button>
+        </div>
+        ${vouchLabel}
       </td>
       <td class="row-actions">
         <button class="btn-sm wa" onclick="sendWhatsappFor(${d.id})">WhatsApp</button>
@@ -275,6 +290,17 @@ async function savePaidUntil(id) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ adminPin, paidUntil }),
   });
+  loadDrivers();
+}
+
+async function saveVouch(id) {
+  const vouchedBy = document.getElementById(`vouch-${id}`).value.trim();
+  await fetch(API + `/api/admin/drivers/${id}/vouch`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ adminPin, vouchedBy }),
+  });
+  showToast(vouchedBy ? "Aval guardado" : "Aval quitado");
   loadDrivers();
 }
 </script>

@@ -48,7 +48,7 @@ router.post("/admin/drivers", checkAdminPin, (req, res) => {
 router.post("/admin/drivers/list", checkAdminPin, (req, res) => {
   const drivers = db
     .prepare(
-      "SELECT id, name, phone, vehicle, pin, status, last_seen, paid_until, created_at FROM drivers ORDER BY created_at DESC"
+      "SELECT id, name, phone, vehicle, pin, status, last_seen, paid_until, vouched_by, vouched_at, created_at FROM drivers ORDER BY created_at DESC"
     )
     .all();
   res.json(drivers);
@@ -58,6 +58,17 @@ router.post("/admin/drivers/:id/paid-until", checkAdminPin, (req, res) => {
   const { paidUntil } = req.body;
   db.prepare("UPDATE drivers SET paid_until = ? WHERE id = ?").run(
     paidUntil || null,
+    req.params.id
+  );
+  res.json({ ok: true });
+});
+
+router.post("/admin/drivers/:id/vouch", checkAdminPin, (req, res) => {
+  const { vouchedBy } = req.body;
+  const vouchedAt = vouchedBy ? new Date().toISOString().slice(0, 10) : null;
+  db.prepare("UPDATE drivers SET vouched_by = ?, vouched_at = ? WHERE id = ?").run(
+    vouchedBy || null,
+    vouchedAt,
     req.params.id
   );
   res.json({ ok: true });
