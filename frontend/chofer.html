@@ -139,7 +139,7 @@ function connectWs() {
     if (type === "ride_taken") removePendingRide(payload.rideId);
     if (type === "ride_cancelled" && currentRide && currentRide.id === payload.rideId) {
       currentRide = null;
-      if (routeLine) { map.removeLayer(routeLine); routeLine = null; }
+      stopRouteTracking();
       showToast("El pasajero canceló el viaje");
       renderRideList();
     }
@@ -160,9 +160,6 @@ function watchLocation() {
         map.setView([myPos.lat, myPos.lng], 15);
       } else {
         myMarker.setLatLng([myPos.lat, myPos.lng]);
-      }
-      if (currentRide && routeLine) {
-        routeLine.setLatLngs([[myPos.lat, myPos.lng], [currentRide.pickup_lat, currentRide.pickup_lng]]);
       }
       if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ type: "location", lat: myPos.lat, lng: myPos.lng }));
@@ -257,6 +254,31 @@ function updateDistances() {
   }
 }
 
+let routeRefreshInterval;
+
+async function fetchRoute(from, to) {
+  const url = `https://router.project-osrm.org/route/v1/driving/${from.lng},${from.lat};${to.lng},${to.lat}?overview=full&geometries=geojson`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error("routing failed");
+  const data = await res.json();
+  const coords = data.routes[0].geometry.coordinates;
+  return coords.map(([lng, lat]) => [lat, lng]);
+}
+
+async function updateRouteLine() {
+  if (!currentRide || !myPos) return;
+  const pickup = { lat: currentRide.pickup_lat, lng: currentRide.pickup_lng };
+  let points;
+  try {
+    points = await fetchRoute(myPos, pickup);
+  } catch {
+    points = [[myPos.lat, myPos.lng], [pickup.lat, pickup.lng]];
+  }
+  if (!currentRide) return; // el viaje pudo terminar mientras esperábamos la respuesta
+  if (routeLine) map.removeLayer(routeLine);
+  routeLine = L.polyline(points, { color: "#f6a623", weight: 4 }).addTo(map);
+}
+
 async function acceptRide(id) {
   const res = await fetch(API + `/api/rides/${id}/accept`, {
     method: "POST",
@@ -277,10 +299,14 @@ async function acceptRide(id) {
   if (currentRide.dest_lat) {
     L.circleMarker([currentRide.dest_lat, currentRide.dest_lng], { color: "#3498db", radius: 8 }).addTo(map);
   }
-  if (myPos) {
-    routeLine = L.polyline([[myPos.lat, myPos.lng], [currentRide.pickup_lat, currentRide.pickup_lng]], { color: "#f6a623" }).addTo(map);
-  }
+  updateRouteLine();
+  routeRefreshInterval = setInterval(updateRouteLine, 15000);
   renderRideList();
+}
+
+function stopRouteTracking() {
+  clearInterval(routeRefreshInterval);
+  if (routeLine) { map.removeLayer(routeLine); routeLine = null; }
 }
 
 async function completeRide() {
@@ -290,7 +316,7 @@ async function completeRide() {
     body: JSON.stringify({ driverId: driver.id }),
   });
   currentRide = null;
-  if (routeLine) { map.removeLayer(routeLine); routeLine = null; }
+  stopRouteTracking();
   showToast("Viaje completado");
   renderRideList();
 }
