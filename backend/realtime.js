@@ -23,6 +23,11 @@ function attach(httpServer) {
         return;
       }
 
+      const existing = driverSockets.get(driverId);
+      if (existing && existing.readyState === existing.OPEN) {
+        existing.close(4001, "logged in elsewhere");
+      }
+
       driverSockets.set(driverId, ws);
 
       ws.on("message", (raw) => {

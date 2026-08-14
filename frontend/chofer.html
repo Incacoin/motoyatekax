@@ -145,8 +145,15 @@ function connectWs() {
       renderRideList();
     }
   };
-  ws.onclose = () => {
+  ws.onclose = (ev) => {
     clearInterval(pingInterval);
+    if (ev.code === 4001) {
+      localStorage.removeItem("motoya_driver");
+      document.getElementById("app").style.display = "none";
+      document.getElementById("login").style.display = "flex";
+      document.getElementById("loginError").textContent = "Tu cuenta se abrió en otro dispositivo, esta sesión se cerró.";
+      return;
+    }
     setTimeout(connectWs, 2000);
   };
 }
