@@ -91,26 +91,68 @@ router.post("/rides/:id/accept", (req, res) => {
   res.json(ride);
 });
 
+router.post("/rides/:id/arrived", (req, res) => {
+  const rideId = Number(req.params.id);
+  const { driverId } = req.body;
+
+  const result = db
+    .prepare(
+      "UPDATE rides SET status = 'llegue', updated_at = datetime('now') WHERE id = ? AND driver_id = ? AND status = 'aceptado'"
+    )
+    .run(rideId, driverId);
+
+  if (result.changes === 0) {
+    return res.status(409).json({ error: "No se pudo actualizar el viaje" });
+  }
+
+  realtime.notifyRide(rideId, "status_change", { status: "llegue" });
+  res.json({ ok: true });
+});
+
+router.post("/rides/:id/start", (req, res) => {
+  const rideId = Number(req.params.id);
+  const { driverId } = req.body;
+
+  const result = db
+    .prepare(
+      "UPDATE rides SET status = 'en_curso', updated_at = datetime('now') WHERE id = ? AND driver_id = ? AND status = 'llegue'"
+    )
+    .run(rideId, driverId);
+
+  if (result.changes === 0) {
+    return res.status(409).json({ error: "No se pudo actualizar el viaje" });
+  }
+
+  realtime.notifyRide(rideId, "status_change", { status: "en_curso" });
+  res.json({ ok: true });
+});
+
 router.post("/rides/:id/complete", (req, res) => {
   const rideId = Number(req.params.id);
   const { driverId } = req.body;
 
   const result = db
     .prepare(
-      "UPDATE rides SET status = 'completado', updated_at = datetime('now') WHERE id = ? AND driver_id = ?"
+      "UPDATE rides SET status = 'completado', updated_at = datetime('now') WHERE id = ? AND driver_id = ? AND status = 'en_curso'"
     )
     .run(rideId, driverId);
 
   if (result.changes === 0) {
-    return res.status(404).json({ error: "Viaje no encontrado" });
+    return res.status(409).json({ error: "No se pudo actualizar el viaje" });
   }
 
   db.prepare("UPDATE drivers SET status = 'disponible' WHERE id = ?").run(
     driverId
   );
 
+  const { count: todayCount } = db
+    .prepare(
+      "SELECT COUNT(*) as count FROM rides WHERE driver_id = ? AND status = 'completado' AND date(updated_at) = date('now')"
+    )
+    .get(driverId);
+
   realtime.notifyRide(rideId, "status_change", { status: "completado" });
-  res.json({ ok: true });
+  res.json({ ok: true, todayCount });
 });
 
 router.post("/rides/:id/cancel", (req, res) => {

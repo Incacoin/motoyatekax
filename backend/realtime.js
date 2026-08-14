@@ -46,7 +46,7 @@ function attach(httpServer) {
 
           const activeRide = db
             .prepare(
-              "SELECT id FROM rides WHERE driver_id = ? AND status IN ('aceptado', 'en_camino')"
+              "SELECT id FROM rides WHERE driver_id = ? AND status IN ('aceptado', 'llegue', 'en_curso')"
             )
             .get(driverId);
           if (activeRide) {

@@ -180,6 +180,8 @@ function connectWs() {
     const { type, payload } = JSON.parse(ev.data);
     if (type === "ride_accepted") onDriverAssigned(payload);
     if (type === "driver_location") onDriverLocation(payload);
+    if (type === "status_change" && payload.status === "llegue") onDriverArrived();
+    if (type === "status_change" && payload.status === "en_curso") onTripStarted();
     if (type === "status_change" && payload.status === "completado") onCompleted();
     if (type === "status_change" && payload.status === "cancelado") onCancelledByDriver();
   };
@@ -205,6 +207,16 @@ function onDriverAssigned(driver) {
   }
 }
 
+function onDriverArrived() {
+  currentRideStatus = "llegue";
+  document.getElementById("statusText").textContent = "Tu chofer ya llegó 🛵 Sal cuando estés listo";
+}
+
+function onTripStarted() {
+  currentRideStatus = "en_curso";
+  document.getElementById("statusText").textContent = "En camino a tu destino 🛵";
+}
+
 function onDriverLocation({ lat, lng }) {
   if (!driverMarker) {
     driverMarker = L.marker([lat, lng]).addTo(statusMap);
@@ -215,7 +227,7 @@ function onDriverLocation({ lat, lng }) {
 
 function onCompleted() {
   currentRideStatus = "completado";
-  document.getElementById("statusText").textContent = "Viaje completado. ¡Gracias por usar MotoYaTekax!";
+  document.getElementById("statusText").textContent = "¡Buen viaje! Gracias por usar MotoYaTekax 🛵";
   document.getElementById("driverCard").style.display = "none";
   document.getElementById("cancelBtn").style.display = "none";
   document.getElementById("newRideBtn").style.display = "inline-block";

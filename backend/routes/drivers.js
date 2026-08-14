@@ -14,7 +14,14 @@ router.post("/drivers/login", (req, res) => {
   if (!driver) {
     return res.status(404).json({ error: "PIN no encontrado" });
   }
-  res.json(driver);
+
+  const { count: todayCount } = db
+    .prepare(
+      "SELECT COUNT(*) as count FROM rides WHERE driver_id = ? AND status = 'completado' AND date(updated_at) = date('now')"
+    )
+    .get(driver.id);
+
+  res.json({ ...driver, todayCount });
 });
 
 module.exports = router;

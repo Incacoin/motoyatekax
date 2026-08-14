@@ -30,6 +30,8 @@
   #switch.on { background: var(--success); }
   #switch.on .knob { left: 25px; background: #fff; }
   .footer-credit { padding: 10px 0 4px; }
+  @keyframes pulseReady { 0%, 100% { box-shadow: 0 0 0 0 rgba(246,166,35,.55); } 50% { box-shadow: 0 0 0 8px rgba(246,166,35,0); } }
+  .btn.ready { animation: pulseReady 1.4s ease-in-out infinite; }
 </style>
 </head>
 <body>
@@ -48,6 +50,7 @@
     <div>
       <div class="name" id="driverName"></div>
       <div id="statusText" style="font-size:13px;color:var(--text-dim);">Desconectado</div>
+      <div id="todayCountText" style="font-size:12px;color:var(--text-faint);"></div>
     </div>
     <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
       <div id="toggle">
@@ -77,6 +80,7 @@ let pendingRides = {};
 let currentRide = null;
 let available = false;
 let myPos = null;
+let todayCount = 0;
 
 function showToast(msg) {
   const el = document.getElementById("toast");
@@ -114,6 +118,7 @@ async function login() {
     });
     if (!res.ok) throw new Error((await res.json()).error || "Error");
     driver = await res.json();
+    todayCount = driver.todayCount || 0;
     localStorage.setItem("motoya_driver", JSON.stringify(driver));
     startApp();
   } catch (e) {
@@ -135,6 +140,7 @@ function startApp() {
   document.getElementById("login").style.display = "none";
   document.getElementById("app").style.display = "flex";
   document.getElementById("driverName").textContent = driver.name;
+  document.getElementById("todayCountText").textContent = `Viajes hoy: ${todayCount}`;
 
   map = L.map("map").setView([20.2098, -89.4620], 14); // Ticul aprox
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -241,18 +247,45 @@ function renderRideList() {
   const el = document.getElementById("rideList");
 
   if (currentRide) {
-    const shape = "current:" + currentRide.id;
+    const shape = "current:" + currentRide.id + ":" + currentRide.status;
     if (shape === renderedShape) { updateDistances(); return; }
     renderedShape = shape;
-    const dist = myPos ? haversine(myPos.lat, myPos.lng, currentRide.pickup_lat, currentRide.pickup_lng).toFixed(1) : "?";
-    el.innerHTML = `
-      <div class="card ride-card active fade-in">
-        <div class="label">Viaje en curso</div>
-        <div class="meta">Pasajero: ${currentRide.rider_name} · ${currentRide.rider_phone}</div>
-        <div class="meta">Recogida: ${currentRide.pickup_label || "punto marcado en el mapa"} (<span id="dist-current">${dist}</span> km)</div>
-        ${currentRide.dest_lat ? `<div class="meta">Destino: ${currentRide.dest_label || "punto marcado en el mapa"} (${haversine(currentRide.pickup_lat, currentRide.pickup_lng, currentRide.dest_lat, currentRide.dest_lng).toFixed(1)} km desde la recogida)</div>` : ""}
-        <button class="btn" onclick="completeRide()">Completar viaje</button>
-      </div>`;
+
+    const destLine = currentRide.dest_lat
+      ? `<div class="meta">Destino: ${currentRide.dest_label || "punto marcado en el mapa"} (${haversine(currentRide.pickup_lat, currentRide.pickup_lng, currentRide.dest_lat, currentRide.dest_lng).toFixed(1)} km desde la recogida)</div>`
+      : "";
+
+    if (currentRide.status === "aceptado") {
+      const dist = myPos ? haversine(myPos.lat, myPos.lng, currentRide.pickup_lat, currentRide.pickup_lng).toFixed(1) : "?";
+      el.innerHTML = `
+        <div class="card ride-card active fade-in">
+          <div class="label">Yendo a recoger</div>
+          <div class="meta">Pasajero: ${currentRide.rider_name} · ${currentRide.rider_phone}</div>
+          <div class="meta">Recogida: ${currentRide.pickup_label || "punto marcado en el mapa"} (<span id="dist-current">${dist}</span> km)</div>
+          ${destLine}
+          <button class="btn" id="btnArrived" onclick="arriveAtPickup()">Ya llegué</button>
+        </div>`;
+    } else if (currentRide.status === "llegue") {
+      el.innerHTML = `
+        <div class="card ride-card active fade-in">
+          <div class="label">Esperando al pasajero</div>
+          <div class="meta">Pasajero: ${currentRide.rider_name} · ${currentRide.rider_phone}</div>
+          <div class="meta">Recogida: ${currentRide.pickup_label || "punto marcado en el mapa"}</div>
+          ${destLine}
+          <button class="btn" onclick="startTrip()">Iniciar viaje</button>
+        </div>`;
+    } else if (currentRide.status === "en_curso") {
+      const dist = myPos && currentRide.dest_lat ? haversine(myPos.lat, myPos.lng, currentRide.dest_lat, currentRide.dest_lng).toFixed(1) : null;
+      el.innerHTML = `
+        <div class="card ride-card active fade-in">
+          <div class="label">Viaje en curso</div>
+          <div class="meta">Pasajero: ${currentRide.rider_name} · ${currentRide.rider_phone}</div>
+          ${currentRide.dest_lat
+            ? `<div class="meta">Destino: ${currentRide.dest_label || "punto marcado en el mapa"} (<span id="dist-current">${dist}</span> km)</div>`
+            : `<div class="meta">Sin destino marcado</div>`}
+          <button class="btn" onclick="completeRide()">Finalizar viaje</button>
+        </div>`;
+    }
     return;
   }
 
@@ -280,8 +313,17 @@ function renderRideList() {
 function updateDistances() {
   if (!myPos) return;
   if (currentRide) {
-    const el = document.getElementById("dist-current");
-    if (el) el.textContent = haversine(myPos.lat, myPos.lng, currentRide.pickup_lat, currentRide.pickup_lng).toFixed(1);
+    if (currentRide.status === "aceptado") {
+      const dist = haversine(myPos.lat, myPos.lng, currentRide.pickup_lat, currentRide.pickup_lng);
+      const el = document.getElementById("dist-current");
+      if (el) el.textContent = dist.toFixed(1);
+      const btn = document.getElementById("btnArrived");
+      if (btn) btn.classList.toggle("ready", dist <= 0.15);
+    } else if (currentRide.status === "en_curso" && currentRide.dest_lat) {
+      const dist = haversine(myPos.lat, myPos.lng, currentRide.dest_lat, currentRide.dest_lng);
+      const el = document.getElementById("dist-current");
+      if (el) el.textContent = dist.toFixed(1);
+    }
     return;
   }
   for (const r of Object.values(pendingRides)) {
@@ -303,16 +345,30 @@ async function fetchRoute(from, to) {
 
 async function updateRouteLine() {
   if (!currentRide || !myPos) return;
-  const pickup = { lat: currentRide.pickup_lat, lng: currentRide.pickup_lng };
+
+  let target = null;
+  let color = "#f6a623";
+  if (currentRide.status === "aceptado") {
+    target = { lat: currentRide.pickup_lat, lng: currentRide.pickup_lng };
+  } else if (currentRide.status === "en_curso" && currentRide.dest_lat) {
+    target = { lat: currentRide.dest_lat, lng: currentRide.dest_lng };
+    color = "#3498db";
+  }
+
+  if (!target) {
+    if (routeLine) { map.removeLayer(routeLine); routeLine = null; }
+    return;
+  }
+
   let points;
   try {
-    points = await fetchRoute(myPos, pickup);
+    points = await fetchRoute(myPos, target);
   } catch {
-    points = [[myPos.lat, myPos.lng], [pickup.lat, pickup.lng]];
+    points = [[myPos.lat, myPos.lng], [target.lat, target.lng]];
   }
   if (!currentRide) return; // el viaje pudo terminar mientras esperábamos la respuesta
   if (routeLine) map.removeLayer(routeLine);
-  routeLine = L.polyline(points, { color: "#f6a623", weight: 4 }).addTo(map);
+  routeLine = L.polyline(points, { color, weight: 4 }).addTo(map);
 }
 
 async function acceptRide(id) {
@@ -326,7 +382,7 @@ async function acceptRide(id) {
     showToast((await res.json()).error || "Ya no disponible");
     return;
   }
-  currentRide = pendingRides[id];
+  currentRide = await res.json();
   pendingRides = {};
   for (const markers of Object.values(pendingMarkers)) markers.forEach((m) => map.removeLayer(m));
   Object.keys(pendingMarkers).forEach((k) => delete pendingMarkers[k]);
@@ -347,15 +403,54 @@ function stopRouteTracking() {
   if (currentDestMarker) { map.removeLayer(currentDestMarker); currentDestMarker = null; }
 }
 
-async function completeRide() {
-  await fetch(API + `/api/rides/${currentRide.id}/complete`, {
+async function arriveAtPickup() {
+  const res = await fetch(API + `/api/rides/${currentRide.id}/arrived`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ driverId: driver.id }),
   });
+  if (!res.ok) {
+    showToast((await res.json()).error || "No se pudo actualizar");
+    return;
+  }
+  currentRide.status = "llegue";
+  updateRouteLine();
+  renderRideList();
+}
+
+async function startTrip() {
+  const res = await fetch(API + `/api/rides/${currentRide.id}/start`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ driverId: driver.id }),
+  });
+  if (!res.ok) {
+    showToast((await res.json()).error || "No se pudo actualizar");
+    return;
+  }
+  currentRide.status = "en_curso";
+  updateRouteLine();
+  renderRideList();
+}
+
+async function completeRide() {
+  const res = await fetch(API + `/api/rides/${currentRide.id}/complete`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ driverId: driver.id }),
+  });
+  if (!res.ok) {
+    showToast((await res.json()).error || "No se pudo finalizar");
+    return;
+  }
+  const data = await res.json();
+  todayCount = data.todayCount ?? todayCount + 1;
+  driver.todayCount = todayCount;
+  localStorage.setItem("motoya_driver", JSON.stringify(driver));
+  document.getElementById("todayCountText").textContent = `Viajes hoy: ${todayCount}`;
   currentRide = null;
   stopRouteTracking();
-  showToast("Viaje completado");
+  showToast("Viaje completado ✅");
   renderRideList();
 }
 
@@ -363,6 +458,7 @@ async function completeRide() {
 const saved = localStorage.getItem("motoya_driver");
 if (saved) {
   driver = JSON.parse(saved);
+  todayCount = driver.todayCount || 0;
   startApp();
 }
 </script>
