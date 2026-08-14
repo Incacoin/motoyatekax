@@ -135,6 +135,12 @@ function connectWs() {
     const { type, payload } = JSON.parse(ev.data);
     if (type === "new_ride") addPendingRide(payload);
     if (type === "ride_taken") removePendingRide(payload.rideId);
+    if (type === "ride_cancelled" && currentRide && currentRide.id === payload.rideId) {
+      currentRide = null;
+      if (routeLine) { map.removeLayer(routeLine); routeLine = null; }
+      showToast("El pasajero canceló el viaje");
+      renderRideList();
+    }
   };
   ws.onclose = () => {
     clearInterval(pingInterval);

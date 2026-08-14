@@ -126,6 +126,9 @@ router.post("/rides/:id/cancel", (req, res) => {
     db.prepare("UPDATE drivers SET status = 'disponible' WHERE id = ?").run(
       ride.driver_id
     );
+    realtime.notifyDriver(ride.driver_id, "ride_cancelled", { rideId });
+  } else {
+    realtime.broadcastRideRemoved(rideId);
   }
 
   realtime.notifyRide(rideId, "status_change", { status: "cancelado" });

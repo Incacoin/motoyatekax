@@ -119,9 +119,20 @@ function broadcastRideTaken(rideId, winningDriverId) {
   }
 }
 
+function broadcastRideRemoved(rideId) {
+  for (const ws of driverSockets.values()) send(ws, "ride_taken", { rideId });
+}
+
+function notifyDriver(driverId, type, payload) {
+  const ws = driverSockets.get(driverId);
+  if (ws) send(ws, type, payload);
+}
+
 module.exports = {
   attach,
   notifyRide,
   broadcastNewRide,
   broadcastRideTaken,
+  broadcastRideRemoved,
+  notifyDriver,
 };
