@@ -23,6 +23,7 @@
   .ride-card.active { border-left-color: var(--success); }
   .ride-card .label { font-weight: 700; font-size: 15px; }
   .ride-card .meta { color: var(--text-dim); font-size: 13.5px; margin: 4px 0; }
+  .ride-card .meta.fare { color: var(--accent); font-weight: 700; font-size: 14px; }
   .ride-card .btn { width: 100%; margin-top: 8px; }
   .empty { text-align: center; color: var(--text-faint); padding: 26px 12px; font-size: 14px; }
   #switch { position: relative; width: 52px; height: 30px; background: #2a2e38; border-radius: 20px; cursor: pointer; transition: background 0.2s ease; }
@@ -105,6 +106,23 @@ function haversine(lat1, lng1, lat2, lng2) {
   const dLng = (lng2 - lng1) * Math.PI / 180;
   const a = Math.sin(dLat/2) ** 2 + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLng/2) ** 2;
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+const FARE_THRESHOLD_KM = 3;
+const FARE_NORMAL = 15;
+const FARE_FAR = 20;
+
+function estimateFare(ride) {
+  const passengers = ride.passengers || 1;
+  let pricePerPerson = FARE_NORMAL;
+  let approx = true;
+  if (ride.dest_lat) {
+    const tripKm = haversine(ride.pickup_lat, ride.pickup_lng, ride.dest_lat, ride.dest_lng);
+    pricePerPerson = tripKm > FARE_THRESHOLD_KM ? FARE_FAR : FARE_NORMAL;
+    approx = false;
+  }
+  const total = pricePerPerson * passengers;
+  return `$${total} MXN · ${passengers} pasajero${passengers > 1 ? "s" : ""}${approx ? " (aprox.)" : ""}`;
 }
 
 async function login() {
@@ -309,6 +327,7 @@ function renderRideList() {
     const destLine = currentRide.dest_lat
       ? `<div class="meta">Destino: ${currentRide.dest_label || "punto marcado en el mapa"} (${haversine(currentRide.pickup_lat, currentRide.pickup_lng, currentRide.dest_lat, currentRide.dest_lng).toFixed(1)} km desde la recogida)</div>`
       : "";
+    const fareLine = `<div class="meta fare">${estimateFare(currentRide)}</div>`;
 
     if (currentRide.status === "aceptado") {
       const dist = myPos ? haversine(myPos.lat, myPos.lng, currentRide.pickup_lat, currentRide.pickup_lng).toFixed(1) : "?";
@@ -318,6 +337,7 @@ function renderRideList() {
           <div class="meta">Pasajero: ${currentRide.rider_name} · ${currentRide.rider_phone}</div>
           <div class="meta">Recogida: ${currentRide.pickup_label || "punto marcado en el mapa"} (<span id="dist-current">${dist}</span> km)</div>
           ${destLine}
+          ${fareLine}
           <button class="btn" id="btnArrived" onclick="arriveAtPickup()">Ya llegué</button>
         </div>`;
     } else if (currentRide.status === "llegue") {
@@ -327,6 +347,7 @@ function renderRideList() {
           <div class="meta">Pasajero: ${currentRide.rider_name} · ${currentRide.rider_phone}</div>
           <div class="meta">Recogida: ${currentRide.pickup_label || "punto marcado en el mapa"}</div>
           ${destLine}
+          ${fareLine}
           <button class="btn" onclick="startTrip()">Iniciar viaje</button>
         </div>`;
     } else if (currentRide.status === "en_curso") {
@@ -338,6 +359,7 @@ function renderRideList() {
           ${currentRide.dest_lat
             ? `<div class="meta">Destino: ${currentRide.dest_label || "punto marcado en el mapa"} (<span id="dist-current">${dist}</span> km)</div>`
             : `<div class="meta">Sin destino marcado</div>`}
+          ${fareLine}
           <button class="btn" onclick="completeRide()">Finalizar viaje</button>
         </div>`;
     }
@@ -360,6 +382,7 @@ function renderRideList() {
         <div class="label">${r.rider_name}</div>
         <div class="meta">Recogida a <span id="dist-${r.id}">${dist}</span> km${r.pickup_label ? " · " + r.pickup_label : ""}</div>
         ${r.dest_lat ? `<div class="meta">Destino: ${r.dest_label || "punto marcado en el mapa"} (${haversine(r.pickup_lat, r.pickup_lng, r.dest_lat, r.dest_lng).toFixed(1)} km desde la recogida)</div>` : ""}
+        <div class="meta fare">${estimateFare(r)}</div>
         <button class="btn" onclick="acceptRide(${r.id})">Aceptar</button>
       </div>`;
   }).join("");

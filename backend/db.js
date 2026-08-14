@@ -29,6 +29,7 @@ db.exec(`
     dest_lat REAL,
     dest_lng REAL,
     dest_label TEXT,
+    passengers INTEGER NOT NULL DEFAULT 1,
     status TEXT NOT NULL DEFAULT 'buscando',
     driver_id INTEGER REFERENCES drivers(id),
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
@@ -38,6 +39,12 @@ db.exec(`
 
 try {
   db.exec("ALTER TABLE drivers ADD COLUMN paid_until TEXT");
+} catch {
+  // la columna ya existe
+}
+
+try {
+  db.exec("ALTER TABLE rides ADD COLUMN passengers INTEGER NOT NULL DEFAULT 1");
 } catch {
   // la columna ya existe
 }

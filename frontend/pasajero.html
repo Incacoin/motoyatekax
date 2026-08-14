@@ -21,6 +21,10 @@
   #pickBar .row .btn-secondary { flex: 1; }
   #pickBar .hint { font-size: 13.5px; color: var(--text-dim); text-align: center; }
   #referenceInput { width: 100%; }
+  .stepper { display: flex; align-items: center; gap: 12px; }
+  .stepper .btn-sm { width: 34px; height: 34px; font-size: 18px; display: flex; align-items: center; justify-content: center; padding: 0; }
+  .stepper span#passengerCount { font-weight: 700; font-size: 16px; min-width: 16px; text-align: center; }
+  #fareEstimate { color: var(--accent); font-weight: 600; }
   #status { align-items: center; justify-content: center; gap: 16px; padding: 24px; text-align: center; }
   #status .big { font-size: 21px; font-weight: 700; }
   #driverCard { padding: 18px; width: 280px; }
@@ -49,7 +53,16 @@
       <button class="btn btn-secondary" onclick="useMyLocation()">Usar mi ubicación</button>
       <button class="btn btn-secondary" onclick="resetPins()">Borrar pines</button>
     </div>
+    <div class="row">
+      <span style="color:var(--text-dim);font-size:14px;">Pasajeros</span>
+      <div class="stepper">
+        <button class="btn-sm" onclick="changePassengers(-1)">−</button>
+        <span id="passengerCount">1</span>
+        <button class="btn-sm" onclick="changePassengers(1)">+</button>
+      </div>
+    </div>
     <input id="referenceInput" placeholder="Referencia (ej. casa azul, portón negro)" />
+    <div id="fareEstimate" class="hint"></div>
     <button class="btn" id="requestBtn" disabled onclick="requestRide()">Pedir mototaxi</button>
   </div>
 </div>
@@ -71,6 +84,39 @@ let pickupMarker = null, destMarker = null;
 let ride = null, ws = null;
 let driverMarker = null;
 let currentRideStatus = "buscando";
+let passengers = 1;
+
+const FARE_THRESHOLD_KM = 3;
+const FARE_NORMAL = 15;
+const FARE_FAR = 20;
+
+function haversine(lat1, lng1, lat2, lng2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat/2) ** 2 + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLng/2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+function changePassengers(delta) {
+  passengers = Math.min(4, Math.max(1, passengers + delta));
+  document.getElementById("passengerCount").textContent = passengers;
+  updateFareEstimate();
+}
+
+function updateFareEstimate() {
+  const el = document.getElementById("fareEstimate");
+  if (!pickup) { el.textContent = ""; return; }
+  let pricePerPerson = FARE_NORMAL;
+  let approx = true;
+  if (dest) {
+    const tripKm = haversine(pickup.lat, pickup.lng, dest.lat, dest.lng);
+    pricePerPerson = tripKm > FARE_THRESHOLD_KM ? FARE_FAR : FARE_NORMAL;
+    approx = false;
+  }
+  const total = pricePerPerson * passengers;
+  el.textContent = `Tarifa estimada: $${total} MXN (${passengers} pasajero${passengers > 1 ? "s" : ""})${approx ? " · aprox., marca destino para afinar" : ""}`;
+}
 
 function numberedIcon(num, color) {
   return L.divIcon({
@@ -109,6 +155,7 @@ function goToMap() {
       document.getElementById("pickHint").textContent = "Listo. Puedes pedir tu mototaxi";
     }
     document.getElementById("requestBtn").disabled = !pickup;
+    updateFareEstimate();
   });
 
   if (navigator.geolocation) {
@@ -127,6 +174,7 @@ function useMyLocation() {
     map.setView(pickup, 16);
     document.getElementById("pickHint").textContent = "Toca el mapa para marcar tu destino (opcional)";
     document.getElementById("requestBtn").disabled = false;
+    updateFareEstimate();
   });
 }
 
@@ -136,6 +184,7 @@ function resetPins() {
   pickup = null; dest = null; pickupMarker = null; destMarker = null;
   document.getElementById("pickHint").textContent = "Toca el mapa para marcar dónde te recogemos";
   document.getElementById("requestBtn").disabled = true;
+  updateFareEstimate();
 }
 
 async function requestRide() {
@@ -152,6 +201,7 @@ async function requestRide() {
       pickup_label: pickupLabel || null,
       dest_lat: dest ? dest.lat : null,
       dest_lng: dest ? dest.lng : null,
+      passengers,
     }),
   });
   ride = await res.json();
