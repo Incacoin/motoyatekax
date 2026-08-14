@@ -18,7 +18,9 @@
   #toggle { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--text-dim); }
   #map { flex: 1; min-height: 0; }
   #panel { max-height: 42vh; overflow-y: auto; background: var(--bg-panel); padding: 10px; }
-  .ride-card { padding: 14px; margin-bottom: 8px; }
+  .ride-card { padding: 14px; margin-bottom: 8px; border-left: 4px solid transparent; }
+  .ride-card.pending { border-left-color: var(--accent); }
+  .ride-card.active { border-left-color: var(--success); }
   .ride-card .label { font-weight: 700; font-size: 15px; }
   .ride-card .meta { color: var(--text-dim); font-size: 13.5px; margin: 4px 0; }
   .ride-card .btn { width: 100%; margin-top: 8px; }
@@ -200,15 +202,21 @@ function removePendingRide(id) {
   renderRideList();
 }
 
+let renderedShape = null;
+
 function renderRideList() {
   const el = document.getElementById("rideList");
+
   if (currentRide) {
+    const shape = "current:" + currentRide.id;
+    if (shape === renderedShape) { updateDistances(); return; }
+    renderedShape = shape;
     const dist = myPos ? haversine(myPos.lat, myPos.lng, currentRide.pickup_lat, currentRide.pickup_lng).toFixed(1) : "?";
     el.innerHTML = `
-      <div class="card ride-card fade-in">
+      <div class="card ride-card active fade-in">
         <div class="label">Viaje en curso</div>
         <div class="meta">Pasajero: ${currentRide.rider_name} · ${currentRide.rider_phone}</div>
-        <div class="meta">Recogida: ${currentRide.pickup_label || "punto marcado en el mapa"} (${dist} km)</div>
+        <div class="meta">Recogida: ${currentRide.pickup_label || "punto marcado en el mapa"} (<span id="dist-current">${dist}</span> km)</div>
         ${currentRide.dest_label ? `<div class="meta">Destino: ${currentRide.dest_label}</div>` : ""}
         <button class="btn" onclick="completeRide()">Completar viaje</button>
       </div>`;
@@ -216,6 +224,10 @@ function renderRideList() {
   }
 
   const rides = Object.values(pendingRides);
+  const shape = rides.length === 0 ? "empty:" + available : "pending:" + rides.map((r) => r.id).sort().join(",");
+  if (shape === renderedShape) { updateDistances(); return; }
+  renderedShape = shape;
+
   if (rides.length === 0) {
     el.innerHTML = `<div class="empty">${available ? "Esperando solicitudes..." : "Actívate como disponible para recibir viajes"}</div>`;
     return;
@@ -223,13 +235,26 @@ function renderRideList() {
   el.innerHTML = rides.map((r) => {
     const dist = myPos ? haversine(myPos.lat, myPos.lng, r.pickup_lat, r.pickup_lng).toFixed(1) : "?";
     return `
-      <div class="card ride-card fade-in">
+      <div class="card ride-card pending fade-in">
         <div class="label">${r.rider_name}</div>
-        <div class="meta">Recogida a ${dist} km${r.pickup_label ? " · " + r.pickup_label : ""}</div>
+        <div class="meta">Recogida a <span id="dist-${r.id}">${dist}</span> km${r.pickup_label ? " · " + r.pickup_label : ""}</div>
         ${r.dest_label ? `<div class="meta">Destino: ${r.dest_label}</div>` : ""}
         <button class="btn" onclick="acceptRide(${r.id})">Aceptar</button>
       </div>`;
   }).join("");
+}
+
+function updateDistances() {
+  if (!myPos) return;
+  if (currentRide) {
+    const el = document.getElementById("dist-current");
+    if (el) el.textContent = haversine(myPos.lat, myPos.lng, currentRide.pickup_lat, currentRide.pickup_lng).toFixed(1);
+    return;
+  }
+  for (const r of Object.values(pendingRides)) {
+    const el = document.getElementById(`dist-${r.id}`);
+    if (el) el.textContent = haversine(myPos.lat, myPos.lng, r.pickup_lat, r.pickup_lng).toFixed(1);
+  }
 }
 
 async function acceptRide(id) {
