@@ -348,12 +348,25 @@ function playNotificationSound() {
   });
 }
 
+const PENDING_RIDE_COLORS = ["#9b59b6", "#2ecc71", "#e84393", "#1abc9c", "#e67e22", "#c0392b"];
+let pendingColorCounter = 0;
+const pendingRideColors = {};
+
+function colorForPendingRide(id) {
+  if (!(id in pendingRideColors)) {
+    pendingRideColors[id] = PENDING_RIDE_COLORS[pendingColorCounter % PENDING_RIDE_COLORS.length];
+    pendingColorCounter++;
+  }
+  return pendingRideColors[id];
+}
+
 function addPendingRide(ride) {
   playNotificationSound();
   pendingRides[ride.id] = ride;
-  const markers = [L.marker([ride.pickup_lat, ride.pickup_lng], { icon: numberedIcon(1, "#f6a623") }).addTo(map)];
+  const color = colorForPendingRide(ride.id);
+  const markers = [L.marker([ride.pickup_lat, ride.pickup_lng], { icon: numberedIcon(1, color) }).addTo(map).bindPopup(ride.rider_name)];
   if (ride.dest_lat) {
-    markers.push(L.marker([ride.dest_lat, ride.dest_lng], { icon: numberedIcon(2, "#3498db") }).addTo(map));
+    markers.push(L.marker([ride.dest_lat, ride.dest_lng], { icon: numberedIcon(2, color) }).addTo(map).bindPopup(ride.rider_name));
   }
   pendingMarkers[ride.id] = markers;
   renderRideList();
@@ -361,6 +374,7 @@ function addPendingRide(ride) {
 
 function removePendingRide(id) {
   delete pendingRides[id];
+  delete pendingRideColors[id];
   if (pendingMarkers[id]) {
     pendingMarkers[id].forEach((m) => map.removeLayer(m));
     delete pendingMarkers[id];
@@ -431,9 +445,10 @@ function renderRideList() {
   }
   el.innerHTML = rides.map((r) => {
     const dist = myPos ? haversine(myPos.lat, myPos.lng, r.pickup_lat, r.pickup_lng).toFixed(1) : "?";
+    const color = colorForPendingRide(r.id);
     return `
       <div class="card ride-card pending fade-in">
-        <div class="label">${r.rider_name}</div>
+        <div class="label"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${color};margin-right:7px;"></span>${r.rider_name}</div>
         <div class="meta">Recogida a <span id="dist-${r.id}">${dist}</span> km${r.pickup_label ? " · " + r.pickup_label : ""}</div>
         ${r.dest_lat ? `<div class="meta">Destino: ${r.dest_label || "punto marcado en el mapa"} (${haversine(r.pickup_lat, r.pickup_lng, r.dest_lat, r.dest_lng).toFixed(1)} km desde la recogida)</div>` : ""}
         <div class="meta fare">${estimateFare(r)}</div>
