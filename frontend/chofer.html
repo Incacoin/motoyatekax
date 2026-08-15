@@ -33,6 +33,8 @@
   .footer-credit { padding: 10px 0 4px; }
   @keyframes pulseReady { 0%, 100% { box-shadow: 0 0 0 0 rgba(246,166,35,.55); } 50% { box-shadow: 0 0 0 8px rgba(246,166,35,0); } }
   .btn.ready { animation: pulseReady 1.4s ease-in-out infinite; }
+  .btn-danger { background: var(--bg-card); color: var(--danger); border: 1px solid rgba(229, 72, 77, 0.35); font-size: 14px; padding: 11px 22px; border-radius: var(--radius-sm); cursor: pointer; width: 100%; margin-top: 8px; }
+  .btn-danger:hover { background: var(--bg-card-hover); }
 </style>
 </head>
 <body>
@@ -85,6 +87,7 @@ let todayCount = 0;
 let otherDriverMarkers = new Map();
 let otherDriversPollTimer = null;
 let didFitOtherDrivers = false;
+let cancellingOwnRide = false;
 
 function showToast(msg) {
   const el = document.getElementById("toast");
@@ -233,7 +236,7 @@ function connectWs() {
     const { type, payload } = JSON.parse(ev.data);
     if (type === "new_ride") addPendingRide(payload);
     if (type === "ride_taken") removePendingRide(payload.rideId);
-    if (type === "ride_cancelled" && currentRide && currentRide.id === payload.rideId) {
+    if (type === "ride_cancelled" && currentRide && currentRide.id === payload.rideId && !cancellingOwnRide) {
       currentRide = null;
       stopRouteTracking();
       showToast("El pasajero canceló el viaje");
@@ -407,6 +410,7 @@ function renderRideList() {
           ${destLine}
           ${fareLine}
           <button class="btn" id="btnArrived" onclick="arriveAtPickup()">Ya llegué</button>
+          <button class="btn-danger" onclick="cancelCurrentRide()">Cancelar viaje</button>
         </div>`;
     } else if (currentRide.status === "llegue") {
       el.innerHTML = `
@@ -417,6 +421,7 @@ function renderRideList() {
           ${destLine}
           ${fareLine}
           <button class="btn" onclick="startTrip()">Iniciar viaje</button>
+          <button class="btn-danger" onclick="cancelCurrentRide()">Cancelar viaje</button>
         </div>`;
     } else if (currentRide.status === "en_curso") {
       const dist = myPos && currentRide.dest_lat ? haversine(myPos.lat, myPos.lng, currentRide.dest_lat, currentRide.dest_lng).toFixed(1) : null;
@@ -598,6 +603,19 @@ async function completeRide() {
   currentRide = null;
   stopRouteTracking();
   showToast("Viaje completado ✅");
+  renderRideList();
+}
+
+async function cancelCurrentRide() {
+  if (!currentRide) return;
+  if (!confirm("¿Cancelar este viaje? Úsalo si el pasajero no se presentó o algo salió mal.")) return;
+  cancellingOwnRide = true;
+  const rideId = currentRide.id;
+  await fetch(API + `/api/rides/${rideId}/cancel`, { method: "POST" });
+  currentRide = null;
+  stopRouteTracking();
+  cancellingOwnRide = false;
+  showToast("Viaje cancelado");
   renderRideList();
 }
 
