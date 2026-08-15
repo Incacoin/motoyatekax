@@ -35,6 +35,13 @@
   .btn.ready { animation: pulseReady 1.4s ease-in-out infinite; }
   .btn-danger { background: var(--bg-card); color: var(--danger); border: 1px solid rgba(229, 72, 77, 0.35); font-size: 14px; padding: 11px 22px; border-radius: var(--radius-sm); cursor: pointer; width: 100%; margin-top: 8px; }
   .btn-danger:hover { background: var(--bg-card-hover); }
+  #chatBox { padding: 12px; margin-top: 8px; display: flex; flex-direction: column; gap: 8px; }
+  #chatMessages { max-height: 110px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
+  .chat-msg { padding: 7px 11px; border-radius: var(--radius-sm); max-width: 82%; font-size: 13.5px; line-height: 1.35; }
+  .chat-msg.me { align-self: flex-end; background: var(--accent); color: var(--accent-ink); }
+  .chat-msg.them { align-self: flex-start; background: var(--bg-card-hover); color: var(--text); }
+  .chat-row { display: flex; gap: 6px; }
+  .chat-row input { flex: 1; padding: 9px 10px; font-size: 14px; }
 </style>
 </head>
 <body>
@@ -66,6 +73,13 @@
   <div id="map"></div>
   <div id="panel">
     <div id="rideList"></div>
+    <div id="chatBox" class="card" style="display:none;">
+      <div id="chatMessages"></div>
+      <div class="chat-row">
+        <input id="chatInput" placeholder="Escríbele al pasajero..." maxlength="300" onkeydown="if(event.key==='Enter')sendChatMessage()" />
+        <button class="btn-sm" onclick="sendChatMessage()">Enviar</button>
+      </div>
+    </div>
     <div class="credit footer-credit">⚡ Tecnología de <strong>Lealtad Digital</strong></div>
   </div>
 </div>
@@ -95,6 +109,33 @@ function showToast(msg) {
   el.classList.add("show");
   clearTimeout(showToast._t);
   showToast._t = setTimeout(() => el.classList.remove("show"), 3200);
+}
+
+function appendChatMessage(text, who) {
+  const el = document.getElementById("chatMessages");
+  const div = document.createElement("div");
+  div.className = "chat-msg " + who;
+  div.textContent = text;
+  el.appendChild(div);
+  el.scrollTop = el.scrollHeight;
+}
+
+function sendChatMessage() {
+  const input = document.getElementById("chatInput");
+  const text = input.value.trim();
+  if (!text || !ws || ws.readyState !== WebSocket.OPEN) return;
+  ws.send(JSON.stringify({ type: "chat", text }));
+  appendChatMessage(text, "me");
+  input.value = "";
+}
+
+function showChat() {
+  document.getElementById("chatMessages").innerHTML = "";
+  document.getElementById("chatBox").style.display = "flex";
+}
+
+function hideChat() {
+  document.getElementById("chatBox").style.display = "none";
 }
 
 function numberedIcon(num, color) {
@@ -239,9 +280,11 @@ function connectWs() {
     if (type === "ride_cancelled" && currentRide && currentRide.id === payload.rideId && !cancellingOwnRide) {
       currentRide = null;
       stopRouteTracking();
+      hideChat();
       showToast("El pasajero canceló el viaje");
       renderRideList();
     }
+    if (type === "chat") appendChatMessage(payload.text, "them");
   };
   ws.onclose = (ev) => {
     clearInterval(pingInterval);
@@ -545,6 +588,7 @@ async function acceptRide(id) {
   }
   updateRouteLine();
   routeRefreshInterval = setInterval(updateRouteLine, 15000);
+  showChat();
   renderRideList();
 }
 
@@ -602,6 +646,7 @@ async function completeRide() {
   document.getElementById("todayCountText").textContent = `Viajes hoy: ${todayCount}`;
   currentRide = null;
   stopRouteTracking();
+  hideChat();
   showToast("Viaje completado ✅");
   renderRideList();
 }
@@ -614,6 +659,7 @@ async function cancelCurrentRide() {
   await fetch(API + `/api/rides/${rideId}/cancel`, { method: "POST" });
   currentRide = null;
   stopRouteTracking();
+  hideChat();
   cancellingOwnRide = false;
   showToast("Viaje cancelado");
   renderRideList();

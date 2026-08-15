@@ -108,6 +108,11 @@ function attach(httpServer) {
             msg.status,
             driverId
           );
+        } else if (msg.type === "chat" && typeof msg.text === "string" && msg.text.trim()) {
+          const ride = activeRideForDriver(driverId);
+          if (ride) {
+            notifyRide(ride.id, "chat", { text: msg.text.trim().slice(0, 300) });
+          }
         }
       });
 
@@ -135,6 +140,21 @@ function attach(httpServer) {
 
       if (!rideSubscribers.has(rideId)) rideSubscribers.set(rideId, new Set());
       rideSubscribers.get(rideId).add(ws);
+
+      ws.on("message", (raw) => {
+        let msg;
+        try {
+          msg = JSON.parse(raw.toString());
+        } catch {
+          return;
+        }
+        if (msg.type === "chat" && typeof msg.text === "string" && msg.text.trim()) {
+          const current = db.prepare("SELECT driver_id FROM rides WHERE id = ?").get(rideId);
+          if (current && current.driver_id) {
+            notifyDriver(current.driver_id, "chat", { text: msg.text.trim().slice(0, 300) });
+          }
+        }
+      });
 
       ws.on("close", () => {
         rideSubscribers.get(rideId)?.delete(ws);

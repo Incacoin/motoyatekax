@@ -32,6 +32,14 @@
   #driverCard .meta { color: var(--text-dim); margin-top: 4px; font-size: 14px; }
   #statusMap { width: 100%; height: 40vh; border-radius: var(--radius-lg); overflow: hidden; border: 1px solid var(--border); }
   #connWarning { display: none; color: var(--danger); font-size: 13.5px; text-align: center; }
+  #chatBox { display: none; flex-direction: column; gap: 8px; padding: 14px; width: 280px; }
+  #chatMessages { max-height: 130px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; text-align: left; }
+  .chat-msg { padding: 7px 11px; border-radius: var(--radius-sm); max-width: 82%; font-size: 13.5px; line-height: 1.35; }
+  .chat-msg.me { align-self: flex-end; background: var(--accent); color: var(--accent-ink); }
+  .chat-msg.them { align-self: flex-start; background: var(--bg-card-hover); color: var(--text); }
+  .chat-row { display: flex; gap: 6px; }
+  .chat-row input { flex: 1; padding: 10px 12px; font-size: 14px; }
+  .chat-row button { padding: 10px 16px; font-size: 14px; }
 </style>
 </head>
 <body>
@@ -73,6 +81,13 @@
   <div id="connWarning"></div>
   <div id="statusMap"></div>
   <div id="driverCard" class="card fade-in" style="display:none;"></div>
+  <div id="chatBox" class="card fade-in">
+    <div id="chatMessages"></div>
+    <div class="chat-row">
+      <input id="chatInput" placeholder="Escríbele a tu chofer..." maxlength="300" onkeydown="if(event.key==='Enter')sendChatMessage()" />
+      <button class="btn btn-secondary" onclick="sendChatMessage()">Enviar</button>
+    </div>
+  </div>
   <button class="btn btn-secondary" id="cancelBtn" onclick="cancelRide()">Cancelar</button>
   <button class="btn" id="newRideBtn" style="display:none;" onclick="location.reload()">Pedir otro viaje</button>
   <div class="credit">⚡ Tecnología de <strong>Lealtad Digital</strong></div>
@@ -306,6 +321,7 @@ function connectWs() {
     if (type === "driver_disconnected") onDriverDisconnected();
     if (type === "driver_reconnected") onDriverReconnected();
     if (type === "driver_lost") onDriverLost();
+    if (type === "chat") appendChatMessage(payload.text, "them");
   };
   ws.onclose = () => {
     clearInterval(pingInterval);
@@ -327,6 +343,7 @@ function onDriverAssigned(driver) {
   if (driver.lat) {
     driverMarker = L.marker([driver.lat, driver.lng], { icon: motoIcon() }).addTo(statusMap);
   }
+  document.getElementById("chatBox").style.display = "flex";
 }
 
 function onDriverArrived() {
@@ -337,6 +354,24 @@ function onDriverArrived() {
 function onTripStarted() {
   currentRideStatus = "en_curso";
   document.getElementById("statusText").textContent = "En camino a tu destino 🛵";
+}
+
+function appendChatMessage(text, who) {
+  const el = document.getElementById("chatMessages");
+  const div = document.createElement("div");
+  div.className = "chat-msg " + who;
+  div.textContent = text;
+  el.appendChild(div);
+  el.scrollTop = el.scrollHeight;
+}
+
+function sendChatMessage() {
+  const input = document.getElementById("chatInput");
+  const text = input.value.trim();
+  if (!text || !ws || ws.readyState !== WebSocket.OPEN) return;
+  ws.send(JSON.stringify({ type: "chat", text }));
+  appendChatMessage(text, "me");
+  input.value = "";
 }
 
 function onDriverDisconnected() {
@@ -373,6 +408,7 @@ function onCompleted() {
   document.getElementById("statusText").textContent = "¡Buen viaje! Gracias por usar MotoYaTekax 🛵";
   document.getElementById("connWarning").style.display = "none";
   document.getElementById("driverCard").style.display = "none";
+  document.getElementById("chatBox").style.display = "none";
   document.getElementById("cancelBtn").style.display = "none";
   document.getElementById("newRideBtn").style.display = "inline-block";
 }
@@ -381,6 +417,7 @@ function onCancelledByDriver() {
   currentRideStatus = "cancelado";
   document.getElementById("statusText").textContent = "El viaje fue cancelado.";
   document.getElementById("connWarning").style.display = "none";
+  document.getElementById("chatBox").style.display = "none";
   document.getElementById("cancelBtn").style.display = "none";
   document.getElementById("newRideBtn").style.display = "inline-block";
 }
@@ -391,6 +428,7 @@ async function cancelRide() {
   await fetch(API + `/api/rides/${ride.id}/cancel`, { method: "POST" });
   document.getElementById("statusText").textContent = "Viaje cancelado.";
   document.getElementById("connWarning").style.display = "none";
+  document.getElementById("chatBox").style.display = "none";
   document.getElementById("cancelBtn").style.display = "none";
   document.getElementById("newRideBtn").style.display = "inline-block";
 }
