@@ -48,7 +48,7 @@ router.post("/admin/drivers", checkAdminPin, (req, res) => {
 router.post("/admin/drivers/list", checkAdminPin, (req, res) => {
   const drivers = db
     .prepare(
-      "SELECT id, name, phone, vehicle, pin, status, last_seen, paid_until, vouched_by, vouched_at, created_at FROM drivers ORDER BY created_at DESC"
+      "SELECT id, name, phone, vehicle, pin, status, last_seen, paid_until, vouched_by, vouched_at, created_at FROM drivers WHERE deleted_at IS NULL ORDER BY created_at DESC"
     )
     .all();
   res.json(drivers);
@@ -93,7 +93,15 @@ router.post("/admin/drivers/:id/update", checkAdminPin, (req, res) => {
 });
 
 router.post("/admin/drivers/:id/delete", checkAdminPin, (req, res) => {
-  db.prepare("DELETE FROM drivers WHERE id = ?").run(req.params.id);
+  const activeRide = db
+    .prepare("SELECT id FROM rides WHERE driver_id = ? AND status IN ('aceptado', 'llegue', 'en_curso')")
+    .get(req.params.id);
+  if (activeRide) {
+    return res.status(409).json({ error: "Este chofer tiene un viaje activo en este momento, no se puede eliminar todavía" });
+  }
+  // Soft delete: conserva la fila (y su nombre en el historial de viajes),
+  // solo lo saca de la lista de choferes activos y le cierra el acceso.
+  db.prepare("UPDATE drivers SET deleted_at = datetime('now'), status = 'offline' WHERE id = ?").run(req.params.id);
   res.json({ ok: true });
 });
 
@@ -123,7 +131,7 @@ router.post("/admin/stats", checkAdminPin, (req, res) => {
     .prepare("SELECT COUNT(*) AS n FROM rides WHERE status = 'cancelado' AND date(updated_at) = date('now')")
     .get().n;
   const driversOnline = db
-    .prepare("SELECT COUNT(*) AS n FROM drivers WHERE status IN ('disponible', 'en_viaje')")
+    .prepare("SELECT COUNT(*) AS n FROM drivers WHERE status IN ('disponible', 'en_viaje') AND deleted_at IS NULL")
     .get().n;
   const topDrivers = db
     .prepare(

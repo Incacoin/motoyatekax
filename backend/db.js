@@ -67,4 +67,10 @@ try {
   // la columna ya existe
 }
 
+try {
+  db.exec("ALTER TABLE drivers ADD COLUMN deleted_at TEXT");
+} catch {
+  // la columna ya existe
+}
+
 module.exports = db;
