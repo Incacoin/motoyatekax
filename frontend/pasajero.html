@@ -129,6 +129,52 @@ function numberedIcon(num, color) {
   });
 }
 
+function motoIcon() {
+  return L.divIcon({
+    className: "",
+    html: `<div style="background:#14161c;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,.4);border:2px solid #f6a623;font-size:17px;">🛵</div>`,
+    iconSize: [32, 32],
+    iconAnchor: [16, 16],
+  });
+}
+
+let availableDriverMarkers = new Map();
+let availableDriversPollTimer = null;
+
+async function loadAvailableDrivers() {
+  const res = await fetch(API + "/api/drivers/available");
+  if (!res.ok) return;
+  const drivers = await res.json();
+  const seen = new Set();
+  for (const d of drivers) {
+    seen.add(d.id);
+    const pos = [d.lat, d.lng];
+    if (availableDriverMarkers.has(d.id)) {
+      availableDriverMarkers.get(d.id).setLatLng(pos);
+    } else {
+      availableDriverMarkers.set(d.id, L.marker(pos, { icon: motoIcon() }).addTo(map).bindPopup(d.name));
+    }
+  }
+  for (const [id, marker] of availableDriverMarkers) {
+    if (!seen.has(id)) {
+      map.removeLayer(marker);
+      availableDriverMarkers.delete(id);
+    }
+  }
+}
+
+function startAvailableDriversPolling() {
+  loadAvailableDrivers();
+  clearInterval(availableDriversPollTimer);
+  availableDriversPollTimer = setInterval(loadAvailableDrivers, 4000);
+}
+
+function stopAvailableDriversPolling() {
+  clearInterval(availableDriversPollTimer);
+  for (const marker of availableDriverMarkers.values()) map.removeLayer(marker);
+  availableDriverMarkers.clear();
+}
+
 function goToMap() {
   const name = document.getElementById("nameInput").value.trim();
   const phone = document.getElementById("phoneInput").value.trim();
@@ -165,6 +211,8 @@ function goToMap() {
       map.setView([pos.coords.latitude, pos.coords.longitude], 15);
     }, () => {});
   }
+
+  startAvailableDriversPolling();
 }
 
 function useMyLocation() {
@@ -208,6 +256,7 @@ async function requestRide() {
   });
   ride = await res.json();
 
+  stopAvailableDriversPolling();
   document.getElementById("mapScreen").classList.remove("active");
   document.getElementById("status").classList.add("active");
 
@@ -258,7 +307,7 @@ function onDriverAssigned(driver) {
     <div class="meta">${driver.vehicle || "Mototaxi"}</div>
     <div class="meta">Tel: ${driver.phone}</div>`;
   if (driver.lat) {
-    driverMarker = L.marker([driver.lat, driver.lng]).addTo(statusMap);
+    driverMarker = L.marker([driver.lat, driver.lng], { icon: motoIcon() }).addTo(statusMap);
   }
 }
 
@@ -295,7 +344,7 @@ function onDriverLost() {
 
 function onDriverLocation({ lat, lng }) {
   if (!driverMarker) {
-    driverMarker = L.marker([lat, lng]).addTo(statusMap);
+    driverMarker = L.marker([lat, lng], { icon: motoIcon() }).addTo(statusMap);
   } else {
     driverMarker.setLatLng([lat, lng]);
   }

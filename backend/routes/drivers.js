@@ -3,6 +3,15 @@ const db = require("../db");
 
 const router = express.Router();
 
+router.get("/drivers/available", (req, res) => {
+  const drivers = db
+    .prepare(
+      "SELECT id, name, lat, lng FROM drivers WHERE status = 'disponible' AND lat IS NOT NULL AND lng IS NOT NULL"
+    )
+    .all();
+  res.json(drivers);
+});
+
 router.post("/drivers/login", (req, res) => {
   const { pin } = req.body;
   const driver = db
