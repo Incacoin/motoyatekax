@@ -239,6 +239,11 @@ function goToMap() {
 
   map.on("click", (e) => placePoint(e.latlng));
 
+  // La barra de búsqueda vive encima del mapa; sin esto, un toque en ella
+  // también le llega al mapa de abajo y coloca un pin en ese punto.
+  L.DomEvent.disableClickPropagation(document.getElementById("searchBar"));
+  L.DomEvent.disableScrollPropagation(document.getElementById("searchBar"));
+
   if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition((pos) => {
       const me = L.latLng(pos.coords.latitude, pos.coords.longitude);
@@ -302,6 +307,11 @@ async function searchAddress(q) {
       div.className = "search-result";
       div.textContent = place.display_name;
       div.onclick = () => selectAddressResult(place);
+      // selectAddressResult vacía #searchResults (quitando este div del DOM)
+      // antes de que el navegador termine de propagar este mismo clic hacia
+      // el mapa — sin esta marca, Leaflet pierde el rastro hacia #searchBar
+      // a mitad de camino y trata el toque como un clic directo en el mapa.
+      div._leaflet_disable_click = true;
       resultsEl.appendChild(div);
     }
   } catch (err) {
