@@ -82,6 +82,9 @@ let currentRide = null;
 let available = false;
 let myPos = null;
 let todayCount = 0;
+let otherDriverMarkers = new Map();
+let otherDriversPollTimer = null;
+let didFitOtherDrivers = false;
 
 function showToast(msg) {
   const el = document.getElementById("toast");
@@ -177,6 +180,42 @@ function startApp() {
 
   connectWs();
   watchLocation();
+  startOtherDriversPolling();
+}
+
+async function loadOtherDrivers() {
+  const res = await fetch(API + "/api/drivers/available");
+  if (!res.ok) return;
+  const drivers = (await res.json()).filter((d) => d.id !== driver.id);
+  const seen = new Set();
+  for (const d of drivers) {
+    seen.add(d.id);
+    const pos = [d.lat, d.lng];
+    if (otherDriverMarkers.has(d.id)) {
+      otherDriverMarkers.get(d.id).setLatLng(pos);
+    } else {
+      otherDriverMarkers.set(d.id, L.marker(pos, { icon: motoIcon() }).addTo(map).bindPopup(d.name));
+    }
+  }
+  for (const [id, marker] of otherDriverMarkers) {
+    if (!seen.has(id)) {
+      map.removeLayer(marker);
+      otherDriverMarkers.delete(id);
+    }
+  }
+
+  if (!didFitOtherDrivers && otherDriverMarkers.size > 0) {
+    didFitOtherDrivers = true;
+    const points = [...otherDriverMarkers.values()].map((m) => m.getLatLng());
+    points.push(myPos ? L.latLng(myPos.lat, myPos.lng) : map.getCenter());
+    map.fitBounds(L.latLngBounds(points), { padding: [40, 40], maxZoom: 15 });
+  }
+}
+
+function startOtherDriversPolling() {
+  loadOtherDrivers();
+  clearInterval(otherDriversPollTimer);
+  otherDriversPollTimer = setInterval(loadOtherDrivers, 4000);
 }
 
 function connectWs() {
@@ -221,7 +260,13 @@ function watchLocation() {
       myPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
       if (!myMarker) {
         myMarker = L.marker([myPos.lat, myPos.lng], { title: "Tú", icon: motoIcon() }).addTo(map);
-        map.setView([myPos.lat, myPos.lng], 15);
+        if (didFitOtherDrivers && otherDriverMarkers.size > 0) {
+          const points = [...otherDriverMarkers.values()].map((m) => m.getLatLng());
+          points.push(L.latLng(myPos.lat, myPos.lng));
+          map.fitBounds(L.latLngBounds(points), { padding: [40, 40], maxZoom: 15 });
+        } else {
+          map.setView([myPos.lat, myPos.lng], 15);
+        }
       } else {
         myMarker.setLatLng([myPos.lat, myPos.lng]);
       }
