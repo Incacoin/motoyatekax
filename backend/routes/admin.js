@@ -112,4 +112,31 @@ router.post("/admin/rides/list", checkAdminPin, (req, res) => {
   res.json(rides);
 });
 
+router.post("/admin/stats", checkAdminPin, (req, res) => {
+  const ridesToday = db
+    .prepare("SELECT COUNT(*) AS n FROM rides WHERE status = 'completado' AND date(updated_at) = date('now')")
+    .get().n;
+  const ridesWeek = db
+    .prepare("SELECT COUNT(*) AS n FROM rides WHERE status = 'completado' AND date(updated_at) >= date('now', '-6 days')")
+    .get().n;
+  const cancelledToday = db
+    .prepare("SELECT COUNT(*) AS n FROM rides WHERE status = 'cancelado' AND date(updated_at) = date('now')")
+    .get().n;
+  const driversOnline = db
+    .prepare("SELECT COUNT(*) AS n FROM drivers WHERE status IN ('disponible', 'en_viaje')")
+    .get().n;
+  const topDrivers = db
+    .prepare(
+      `SELECT d.name, COUNT(*) AS rides
+       FROM rides r JOIN drivers d ON d.id = r.driver_id
+       WHERE r.status = 'completado' AND date(r.updated_at) >= date('now', '-6 days')
+       GROUP BY r.driver_id
+       ORDER BY rides DESC
+       LIMIT 5`
+    )
+    .all();
+
+  res.json({ ridesToday, ridesWeek, cancelledToday, driversOnline, topDrivers });
+});
+
 module.exports = router;

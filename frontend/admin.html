@@ -43,6 +43,18 @@
   .dot.completado { background: var(--success); box-shadow: 0 0 0 3px rgba(46, 204, 113, 0.18); }
   .dot.cancelado { background: var(--danger); box-shadow: 0 0 0 3px rgba(231, 76, 60, 0.18); }
   .ago { color: var(--text-dim); font-size: 12px; }
+  .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 30px; }
+  .stat-tile { padding: 16px; }
+  .stat-tile .label { color: var(--text-dim); font-size: 12.5px; }
+  .stat-tile .value { font-size: 30px; font-weight: 700; color: var(--text); margin-top: 4px; }
+  .stat-tile.accent .value { color: var(--accent); }
+  .stat-tile.danger .value { color: var(--danger); }
+  .top-drivers { display: flex; flex-direction: column; gap: 10px; margin-bottom: 30px; }
+  .top-driver-row { display: flex; align-items: center; gap: 10px; font-size: 13.5px; }
+  .top-driver-row .name { width: 108px; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .top-driver-bar-wrap { flex: 1; background: var(--bg-card); border-radius: 4px; height: 8px; overflow: hidden; }
+  .top-driver-bar { height: 100%; background: var(--accent); border-radius: 0 4px 4px 0; }
+  .top-driver-row .count { width: 22px; text-align: right; font-variant-numeric: tabular-nums; color: var(--text-dim); }
 </style>
 </head>
 <body>
@@ -55,6 +67,31 @@
 </div>
 
 <div id="app" class="screen">
+  <h1>Resumen</h1>
+  <p class="section-hint">Últimos 7 días.</p>
+  <div class="stats-grid">
+    <div class="card stat-tile accent">
+      <div class="label">Viajes hoy</div>
+      <div class="value" id="statRidesToday">—</div>
+    </div>
+    <div class="card stat-tile accent">
+      <div class="label">Viajes esta semana</div>
+      <div class="value" id="statRidesWeek">—</div>
+    </div>
+    <div class="card stat-tile danger">
+      <div class="label">Cancelados hoy</div>
+      <div class="value" id="statCancelledToday">—</div>
+    </div>
+    <div class="card stat-tile">
+      <div class="label">Choferes conectados ahora</div>
+      <div class="value" id="statDriversOnline">—</div>
+    </div>
+  </div>
+  <div id="topDriversWrap">
+    <p class="section-hint" style="margin-bottom:10px;">Choferes más activos (7 días)</p>
+    <div class="top-drivers" id="topDrivers"></div>
+  </div>
+
   <h1>Dar de alta un chofer</h1>
   <p class="section-hint">Genera su PIN y envíaselo directo por WhatsApp.</p>
   <div class="field">
@@ -179,8 +216,33 @@ async function login() {
   document.getElementById("app").classList.add("active");
   loadDrivers();
   loadRides();
+  loadStats();
   clearInterval(ridesPollTimer);
-  ridesPollTimer = setInterval(loadRides, 4000);
+  ridesPollTimer = setInterval(() => { loadRides(); loadStats(); }, 4000);
+}
+
+async function loadStats() {
+  const res = await fetch(API + "/api/admin/stats", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ adminPin }),
+  });
+  if (!res.ok) return;
+  const s = await res.json();
+  document.getElementById("statRidesToday").textContent = s.ridesToday;
+  document.getElementById("statRidesWeek").textContent = s.ridesWeek;
+  document.getElementById("statCancelledToday").textContent = s.cancelledToday;
+  document.getElementById("statDriversOnline").textContent = s.driversOnline;
+
+  const max = Math.max(1, ...s.topDrivers.map((d) => d.rides));
+  document.getElementById("topDrivers").innerHTML = s.topDrivers.length
+    ? s.topDrivers.map((d) => `
+      <div class="top-driver-row">
+        <span class="name">${d.name}</span>
+        <div class="top-driver-bar-wrap"><div class="top-driver-bar" style="width:${(d.rides / max) * 100}%"></div></div>
+        <span class="count">${d.rides}</span>
+      </div>`).join("")
+    : `<div class="ago">Todavía no hay viajes completados esta semana.</div>`;
 }
 
 async function registerDriver() {
