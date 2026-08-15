@@ -22,7 +22,14 @@
   #form input { width: 260px; }
   #formError { color: var(--danger); font-size: 14px; min-height: 18px; }
   .btn:disabled { opacity: 0.4; }
-  #map { flex: 1; min-height: 0; }
+  #map { flex: 1; min-height: 0; position: relative; }
+  #searchBar { position: absolute; top: 12px; left: 12px; right: 12px; z-index: 1000; }
+  #addressSearch { width: 100%; box-sizing: border-box; padding: 12px 14px; font-size: 14.5px; border-radius: var(--radius-md); border: 1px solid var(--border); background: var(--bg-card); color: var(--text); box-shadow: var(--shadow-card); }
+  #searchResults { margin-top: 6px; border-radius: var(--radius-md); overflow: hidden; box-shadow: var(--shadow-card); }
+  #searchResults:not(:empty) { border: 1px solid var(--border); }
+  .search-result { padding: 11px 14px; background: var(--bg-card); color: var(--text); font-size: 13.5px; cursor: pointer; border-bottom: 1px solid var(--border); }
+  .search-result:last-child { border-bottom: none; }
+  .search-result:hover, .search-result:active { background: var(--bg-card-hover); }
   #pickBar { padding: 12px; background: var(--bg-panel); border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 10px; }
   #pickBar .row { display: flex; gap: 8px; align-items: center; justify-content: space-between; }
   #pickBar .row .btn-secondary { flex: 1; }
@@ -62,7 +69,12 @@
 </div>
 
 <div id="mapScreen" class="screen">
-  <div id="map"></div>
+  <div id="map">
+    <div id="searchBar">
+      <input id="addressSearch" placeholder="Buscar dirección..." autocomplete="off" oninput="onAddressInput()" onkeydown="if(event.key==='Enter'){event.preventDefault(); searchAddress(this.value.trim());}" />
+      <div id="searchResults"></div>
+    </div>
+  </div>
   <div id="pickBar">
     <div class="hint" id="pickHint">Toca el mapa para marcar dónde te recogemos</div>
     <div class="row">
@@ -225,19 +237,7 @@ function goToMap() {
     attribution: "&copy; OpenStreetMap",
   }).addTo(map);
 
-  map.on("click", (e) => {
-    if (!pickup) {
-      pickup = e.latlng;
-      pickupMarker = L.marker(pickup, { icon: numberedIcon(1, "#f6a623") }).addTo(map).bindPopup("Recogida").openPopup();
-      document.getElementById("pickHint").textContent = "Ahora toca el mapa para marcar tu destino (opcional)";
-    } else if (!dest) {
-      dest = e.latlng;
-      destMarker = L.marker(dest, { icon: numberedIcon(2, "#3498db") }).addTo(map).bindPopup("Destino").openPopup();
-      document.getElementById("pickHint").textContent = "Listo. Puedes pedir tu mototaxi";
-    }
-    document.getElementById("requestBtn").disabled = !pickup;
-    updateFareEstimate();
-  });
+  map.on("click", (e) => placePoint(e.latlng));
 
   if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition((pos) => {
@@ -255,6 +255,69 @@ function goToMap() {
   startAvailableDriversPolling();
 }
 
+function placePoint(latlng) {
+  if (!pickup) {
+    pickup = latlng;
+    pickupMarker = L.marker(pickup, { icon: numberedIcon(1, "#f6a623") }).addTo(map).bindPopup("Recogida").openPopup();
+    document.getElementById("pickHint").textContent = "Ahora toca el mapa (o busca) para marcar tu destino (opcional)";
+  } else if (!dest) {
+    dest = latlng;
+    destMarker = L.marker(dest, { icon: numberedIcon(2, "#3498db") }).addTo(map).bindPopup("Destino").openPopup();
+    document.getElementById("pickHint").textContent = "Listo. Puedes pedir tu mototaxi";
+  }
+  document.getElementById("requestBtn").disabled = !pickup;
+  updateFareEstimate();
+}
+
+const TEKAX_VIEWBOX = "-89.712,20.4098,-89.212,20.0098";
+let addressSearchDebounce = null;
+let addressSearchSeq = 0;
+
+function onAddressInput() {
+  clearTimeout(addressSearchDebounce);
+  const q = document.getElementById("addressSearch").value.trim();
+  if (q.length < 3) {
+    document.getElementById("searchResults").innerHTML = "";
+    return;
+  }
+  addressSearchDebounce = setTimeout(() => searchAddress(q), 450);
+}
+
+async function searchAddress(q) {
+  if (!q || q.length < 3) return;
+  const seq = ++addressSearchSeq;
+  const resultsEl = document.getElementById("searchResults");
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&viewbox=${TEKAX_VIEWBOX}&countrycodes=mx&limit=5`;
+    const res = await fetch(url);
+    const places = await res.json();
+    if (seq !== addressSearchSeq) return; // respuesta vieja, ya se escribió otra búsqueda
+    if (!places.length) {
+      resultsEl.innerHTML = `<div class="search-result" style="color:var(--text-dim);cursor:default;">Sin resultados</div>`;
+      return;
+    }
+    resultsEl.innerHTML = "";
+    for (const place of places) {
+      const div = document.createElement("div");
+      div.className = "search-result";
+      div.textContent = place.display_name;
+      div.onclick = () => selectAddressResult(place);
+      resultsEl.appendChild(div);
+    }
+  } catch (err) {
+    if (seq !== addressSearchSeq) return;
+    resultsEl.innerHTML = `<div class="search-result" style="color:var(--danger);cursor:default;">No se pudo buscar, intenta de nuevo</div>`;
+  }
+}
+
+function selectAddressResult(place) {
+  const latlng = L.latLng(parseFloat(place.lat), parseFloat(place.lon));
+  placePoint(latlng);
+  map.setView(latlng, 17);
+  document.getElementById("addressSearch").value = "";
+  document.getElementById("searchResults").innerHTML = "";
+}
+
 function useMyLocation() {
   if (!navigator.geolocation) return;
   navigator.geolocation.getCurrentPosition((pos) => {
@@ -262,7 +325,7 @@ function useMyLocation() {
     if (pickupMarker) map.removeLayer(pickupMarker);
     pickupMarker = L.marker(pickup, { icon: numberedIcon(1, "#f6a623") }).addTo(map).bindPopup("Recogida (tu ubicación)").openPopup();
     map.setView(pickup, 16);
-    document.getElementById("pickHint").textContent = "Toca el mapa para marcar tu destino (opcional)";
+    document.getElementById("pickHint").textContent = "Ahora toca el mapa (o busca) para marcar tu destino (opcional)";
     document.getElementById("requestBtn").disabled = false;
     updateFareEstimate();
   });

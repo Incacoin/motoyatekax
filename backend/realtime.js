@@ -14,10 +14,15 @@ const disconnectTimers = new Map();
 // alarmar al pasajero de más; si pasa esto, algo de verdad se cayó.
 const DISCONNECT_GRACE_MS = 20000;
 
+// Un chofer normalmente solo tiene un viaje activo a la vez, pero si su app se
+// recargó a medio viaje (pantalla apagada, refresh) el viaje viejo se queda
+// "aceptado" en la base aunque el chofer ya siga con otro. ORDER BY id DESC
+// asegura que siempre agarremos el viaje que el chofer está atendiendo de
+// verdad (el más reciente), no un viaje fantasma abandonado.
 function activeRideForDriver(driverId) {
   return db
     .prepare(
-      "SELECT id, driver_disconnected_at FROM rides WHERE driver_id = ? AND status IN ('aceptado', 'llegue', 'en_curso')"
+      "SELECT id, driver_disconnected_at FROM rides WHERE driver_id = ? AND status IN ('aceptado', 'llegue', 'en_curso') ORDER BY id DESC LIMIT 1"
     )
     .get(driverId);
 }
@@ -95,11 +100,7 @@ function attach(httpServer) {
             "UPDATE drivers SET lat = ?, lng = ?, last_seen = datetime('now') WHERE id = ?"
           ).run(lat, lng, driverId);
 
-          const activeRide = db
-            .prepare(
-              "SELECT id FROM rides WHERE driver_id = ? AND status IN ('aceptado', 'llegue', 'en_curso')"
-            )
-            .get(driverId);
+          const activeRide = activeRideForDriver(driverId);
           if (activeRide) {
             notifyRide(activeRide.id, "driver_location", { lat, lng });
           }
