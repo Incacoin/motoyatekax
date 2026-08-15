@@ -140,6 +140,7 @@ function motoIcon() {
 
 let availableDriverMarkers = new Map();
 let availableDriversPollTimer = null;
+let didFitAvailableDrivers = false;
 
 async function loadAvailableDrivers() {
   const res = await fetch(API + "/api/drivers/available");
@@ -161,9 +162,19 @@ async function loadAvailableDrivers() {
       availableDriverMarkers.delete(id);
     }
   }
+
+  // Solo la primera vez que hay choferes: ajusta el mapa para que quepan
+  // todos. Después no, para no mover el mapa mientras el pasajero marca sus puntos.
+  if (!didFitAvailableDrivers && availableDriverMarkers.size > 0) {
+    didFitAvailableDrivers = true;
+    const points = [...availableDriverMarkers.values()].map((m) => m.getLatLng());
+    points.push(map.getCenter());
+    map.fitBounds(L.latLngBounds(points), { padding: [40, 40], maxZoom: 15 });
+  }
 }
 
 function startAvailableDriversPolling() {
+  didFitAvailableDrivers = false;
   loadAvailableDrivers();
   clearInterval(availableDriversPollTimer);
   availableDriversPollTimer = setInterval(loadAvailableDrivers, 4000);
@@ -208,7 +219,14 @@ function goToMap() {
 
   if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition((pos) => {
-      map.setView([pos.coords.latitude, pos.coords.longitude], 15);
+      const me = L.latLng(pos.coords.latitude, pos.coords.longitude);
+      if (didFitAvailableDrivers && availableDriverMarkers.size > 0) {
+        const points = [...availableDriverMarkers.values()].map((m) => m.getLatLng());
+        points.push(me);
+        map.fitBounds(L.latLngBounds(points), { padding: [40, 40], maxZoom: 15 });
+      } else {
+        map.setView(me, 15);
+      }
     }, () => {});
   }
 
