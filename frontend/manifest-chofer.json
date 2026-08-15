@@ -1,6 +1,6 @@
 {
   "name": "MotoYaTekax Chofer",
-  "short_name": "Chofer MotoYa",
+  "short_name": "Chofer Tekax",
   "description": "Recibe y acepta viajes de MotoYaTekax",
   "id": "/chofer.html",
   "start_url": "/chofer.html",
