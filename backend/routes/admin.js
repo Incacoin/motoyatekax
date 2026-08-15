@@ -120,6 +120,11 @@ router.post("/admin/rides/list", checkAdminPin, (req, res) => {
   res.json(rides);
 });
 
+router.post("/admin/rides/reset", checkAdminPin, (req, res) => {
+  db.exec("DELETE FROM rides");
+  res.json({ ok: true });
+});
+
 router.post("/admin/stats", checkAdminPin, (req, res) => {
   const ridesToday = db
     .prepare("SELECT COUNT(*) AS n FROM rides WHERE status = 'completado' AND date(updated_at) = date('now')")
