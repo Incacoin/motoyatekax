@@ -4,7 +4,7 @@
   "description": "Pide tu mototaxi en Tekax",
   "id": "/pasajero.html",
   "start_url": "/pasajero.html",
-  "scope": "/",
+  "scope": "/pasajero.html",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#0b0d12",

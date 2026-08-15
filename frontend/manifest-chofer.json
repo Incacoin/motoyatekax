@@ -4,7 +4,7 @@
   "description": "Recibe y acepta viajes de MotoYaTekax",
   "id": "/chofer.html",
   "start_url": "/chofer.html",
-  "scope": "/",
+  "scope": "/chofer.html",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#0b0d12",
