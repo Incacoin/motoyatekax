@@ -66,6 +66,10 @@
   .top-driver-bar-wrap { flex: 1; background: var(--bg-card); border-radius: 4px; height: 8px; overflow: hidden; }
   .top-driver-bar { height: 100%; background: var(--accent); border-radius: 0 4px 4px 0; }
   .top-driver-row .count { width: 22px; text-align: right; font-variant-numeric: tabular-nums; color: var(--text-dim); }
+  .app-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 14px; margin-bottom: 8px; flex-wrap: wrap; }
+  .app-row .who { display: flex; flex-direction: column; gap: 2px; }
+  .app-row .who .name { font-weight: 700; }
+  .app-row .who .meta { font-size: 12.5px; color: var(--text-dim); }
 </style>
 </head>
 <body>
@@ -102,6 +106,10 @@
     <p class="section-hint" style="margin-bottom:10px;">Choferes más activos (7 días)</p>
     <div class="top-drivers" id="topDrivers"></div>
   </div>
+
+  <h1>Solicitudes de chofer</h1>
+  <p class="section-hint">Gente que se registró desde el QR de "Quiero ser chofer".</p>
+  <div id="applicationsList"></div>
 
   <h1>Dar de alta un chofer</h1>
   <p class="section-hint">Genera su PIN y envíaselo directo por WhatsApp.</p>
@@ -240,8 +248,53 @@ async function login() {
   loadDrivers();
   loadRides();
   loadStats();
+  loadApplications();
   clearInterval(ridesPollTimer);
-  ridesPollTimer = setInterval(() => { loadRides(); loadStats(); }, 4000);
+  ridesPollTimer = setInterval(() => { loadRides(); loadStats(); loadApplications(); }, 4000);
+}
+
+async function loadApplications() {
+  const res = await fetch(API + "/api/admin/chofer-solicitudes/list", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ adminPin }),
+  });
+  if (!res.ok) return;
+  renderApplications(await res.json());
+}
+
+function renderApplications(apps) {
+  const wrap = document.getElementById("applicationsList");
+  wrap.innerHTML = apps.length
+    ? apps.map((a) => `
+      <div class="card app-row">
+        <div class="who">
+          <span class="name">${a.name}</span>
+          <span class="meta">${a.phone} · ${timeAgo(a.created_at)}</span>
+        </div>
+        <div class="row-actions">
+          <button class="btn-sm" onclick="useApplication(${a.id}, '${a.name.replace(/'/g, "\\'")}', '${a.phone}')">Usar datos</button>
+          <button class="btn-sm danger" onclick="dismissApplication(${a.id})">Descartar</button>
+        </div>
+      </div>`).join("")
+    : `<div class="ago">No hay solicitudes pendientes.</div>`;
+}
+
+function useApplication(id, name, phone) {
+  document.getElementById("driverName").value = name;
+  document.getElementById("driverPhone").value = phone;
+  document.getElementById("driverName").scrollIntoView({ behavior: "smooth", block: "center" });
+  dismissApplication(id, true);
+}
+
+async function dismissApplication(id, silent) {
+  await fetch(API + `/api/admin/chofer-solicitudes/${id}/dismiss`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ adminPin }),
+  });
+  if (!silent) showToast("Solicitud descartada");
+  loadApplications();
 }
 
 async function loadStats() {
