@@ -105,6 +105,22 @@ router.post("/admin/drivers/:id/delete", checkAdminPin, (req, res) => {
   res.json({ ok: true });
 });
 
+router.post("/admin/chofer-solicitudes/list", checkAdminPin, (req, res) => {
+  const apps = db
+    .prepare(
+      "SELECT id, name, phone, status, created_at FROM driver_applications WHERE status = 'pendiente' ORDER BY created_at DESC"
+    )
+    .all();
+  res.json(apps);
+});
+
+router.post("/admin/chofer-solicitudes/:id/dismiss", checkAdminPin, (req, res) => {
+  db.prepare("UPDATE driver_applications SET status = 'descartada' WHERE id = ?").run(
+    req.params.id
+  );
+  res.json({ ok: true });
+});
+
 router.post("/admin/rides/list", checkAdminPin, (req, res) => {
   const rides = db
     .prepare(
