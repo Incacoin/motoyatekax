@@ -33,4 +33,17 @@ router.post("/drivers/login", (req, res) => {
   res.json({ ...driver, todayCount });
 });
 
+router.post("/chofer-solicitudes", (req, res) => {
+  const { name, phone } = req.body;
+  if (!name || !phone) {
+    return res.status(400).json({ error: "Falta nombre o teléfono" });
+  }
+
+  db.prepare("INSERT INTO driver_applications (name, phone) VALUES (?, ?)").run(
+    name,
+    phone
+  );
+  res.status(201).json({ ok: true });
+});
+
 module.exports = router;
