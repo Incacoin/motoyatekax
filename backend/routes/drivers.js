@@ -34,14 +34,15 @@ router.post("/drivers/login", (req, res) => {
 });
 
 router.post("/chofer-solicitudes", (req, res) => {
-  const { name, phone } = req.body;
-  if (!name || !phone) {
-    return res.status(400).json({ error: "Falta nombre o teléfono" });
+  const { name, phone, photo } = req.body;
+  if (!name || !phone || !photo) {
+    return res.status(400).json({ error: "Falta nombre, teléfono o foto" });
   }
 
-  db.prepare("INSERT INTO driver_applications (name, phone) VALUES (?, ?)").run(
+  db.prepare("INSERT INTO driver_applications (name, phone, photo) VALUES (?, ?, ?)").run(
     name,
-    phone
+    phone,
+    photo
   );
   res.status(201).json({ ok: true });
 });
