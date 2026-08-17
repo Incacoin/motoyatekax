@@ -30,6 +30,13 @@
   .vouchRow input[type="text"] { width: 110px; padding: 7px 8px; font-size: 13px; background: var(--bg-card); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius-sm); }
   .sin-aval { color: var(--danger); font-size: 12px; margin-top: 3px; }
   .avalado { color: var(--success); font-size: 12px; margin-top: 3px; }
+  .badge-tipo { display: inline-block; padding: 3px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .badge-tipo.formal { background: rgba(46, 204, 113, 0.15); color: var(--success); }
+  .badge-tipo.informal { background: rgba(246, 166, 35, 0.15); color: var(--accent); }
+  select.tipo-select { padding: 7px 8px; font-size: 13px; background: var(--bg-card); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius-sm); }
+  .tipo-tabs { display: flex; gap: 8px; margin-bottom: 14px; }
+  .tipo-tabs button { padding: 7px 14px; font-size: 13px; border-radius: 999px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-dim); cursor: pointer; }
+  .tipo-tabs button.active { background: var(--accent); color: #1a1a1a; border-color: var(--accent); }
   .phoneRow { display: flex; gap: 8px; align-items: center; }
   .phoneRow .prefix { padding: 13px 10px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-dim); font-size: 16px; }
   .phoneRow input { flex: 1; }
@@ -109,6 +116,13 @@
     <label>Vehículo (opcional)</label>
     <input id="driverVehicle" placeholder="Ej. Mototaxi rojo, placa ABC123" />
   </div>
+  <div class="field">
+    <label>Tipo</label>
+    <select id="driverTipo" class="tipo-select">
+      <option value="informal">Informal (sin placa)</option>
+      <option value="formal">Formal (con placa/concesión)</option>
+    </select>
+  </div>
   <button class="btn" onclick="registerDriver()">Registrar chofer</button>
   <div id="err2"></div>
 
@@ -120,10 +134,15 @@
   </div>
 
   <h1>Choferes registrados</h1>
+  <div class="tipo-tabs" id="tipoTabs">
+    <button class="active" onclick="setTipoFilter('todos')">Todos</button>
+    <button onclick="setTipoFilter('informal')">Informales</button>
+    <button onclick="setTipoFilter('formal')">Formales</button>
+  </div>
   <div class="table-wrap">
     <table>
       <thead>
-        <tr><th>Nombre</th><th>PIN</th><th>Teléfono</th><th>Estado</th><th>Inscrito</th><th>Vigente hasta</th><th>Aval sindicato</th><th></th></tr>
+        <tr><th>Nombre</th><th>PIN</th><th>Teléfono</th><th>Tipo</th><th>Estado</th><th>Inscrito</th><th>Vigente hasta</th><th>Aval sindicato</th><th></th></tr>
       </thead>
       <tbody id="driverRows"></tbody>
     </table>
@@ -249,6 +268,7 @@ async function registerDriver() {
   const name = document.getElementById("driverName").value.trim();
   const phone = document.getElementById("driverPhone").value.trim();
   const vehicle = document.getElementById("driverVehicle").value.trim();
+  const tipo = document.getElementById("driverTipo").value;
   document.getElementById("err2").textContent = "";
 
   if (!name || !phone) {
@@ -259,7 +279,7 @@ async function registerDriver() {
   const res = await fetch(API + "/api/admin/drivers", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ adminPin, name, phone, vehicle }),
+    body: JSON.stringify({ adminPin, name, phone, vehicle, tipo }),
   });
   if (!res.ok) {
     document.getElementById("err2").textContent = (await res.json()).error;
@@ -275,6 +295,7 @@ async function registerDriver() {
   document.getElementById("driverName").value = "";
   document.getElementById("driverPhone").value = "";
   document.getElementById("driverVehicle").value = "";
+  document.getElementById("driverTipo").value = "informal";
 
   loadDrivers();
 }
@@ -303,6 +324,7 @@ async function saveEdit(id) {
   const name = document.getElementById(`edit-name-${id}`).value.trim();
   const phone = document.getElementById(`edit-phone-${id}`).value.trim();
   const vehicle = document.getElementById(`edit-vehicle-${id}`).value.trim();
+  const tipo = document.getElementById(`edit-tipo-${id}`).value;
   if (!name || !phone) {
     showToast("Escribe nombre y teléfono");
     return;
@@ -310,7 +332,7 @@ async function saveEdit(id) {
   await fetch(API + `/api/admin/drivers/${id}/update`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ adminPin, name, phone, vehicle }),
+    body: JSON.stringify({ adminPin, name, phone, vehicle, tipo }),
   });
   editingId = null;
   loadDrivers();
@@ -330,8 +352,37 @@ async function deleteDriver(id, name) {
   loadDrivers();
 }
 
+let tipoFilter = "todos";
+
+function setTipoFilter(tipo) {
+  tipoFilter = tipo;
+  document.querySelectorAll("#tipoTabs button").forEach((b, i) => {
+    b.classList.toggle("active", ["todos", "informal", "formal"][i] === tipo);
+  });
+  renderDriverRows();
+}
+
+function tipoBadge(tipo) {
+  const t = tipo === "formal" ? "formal" : "informal";
+  const label = t === "formal" ? "Formal" : "Informal";
+  return `<span class="badge-tipo ${t}">${label}</span>`;
+}
+
+function tipoSelect(id, tipo) {
+  const t = tipo === "formal" ? "formal" : "informal";
+  return `
+    <select id="edit-tipo-${id}" class="tipo-select">
+      <option value="informal" ${t === "informal" ? "selected" : ""}>Informal</option>
+      <option value="formal" ${t === "formal" ? "selected" : ""}>Formal</option>
+    </select>`;
+}
+
 function renderDriverRows() {
-  document.getElementById("driverRows").innerHTML = driversCache.map((d) => {
+  const rows = tipoFilter === "todos"
+    ? driversCache
+    : driversCache.filter((d) => (d.tipo || "informal") === tipoFilter);
+
+  document.getElementById("driverRows").innerHTML = rows.map((d) => {
     if (editingId === d.id) {
       return `
       <tr>
@@ -343,6 +394,7 @@ function renderDriverRows() {
             <input id="edit-phone-${d.id}" value="${d.phone}" inputmode="numeric" maxlength="10" oninput="this.value = this.value.replace(/\\D/g, '')" />
           </div>
         </td>
+        <td>${tipoSelect(d.id, d.tipo)}</td>
         <td><span class="dot ${d.status}"></span>${d.status}</td>
         <td>${d.created_at ? d.created_at.slice(0, 10) : ""}</td>
         <td><input id="edit-vehicle-${d.id}" value="${d.vehicle || ""}" placeholder="Vehículo" /></td>
@@ -367,6 +419,7 @@ function renderDriverRows() {
       <td>${d.name}</td>
       <td>${d.pin}</td>
       <td>${d.phone}</td>
+      <td>${tipoBadge(d.tipo)}</td>
       <td><span class="dot ${d.status}"></span>${d.status}</td>
       <td>${d.created_at ? d.created_at.slice(0, 10) : ""}</td>
       <td>

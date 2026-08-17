@@ -73,4 +73,10 @@ try {
   // la columna ya existe
 }
 
+try {
+  db.exec("ALTER TABLE drivers ADD COLUMN tipo TEXT NOT NULL DEFAULT 'informal'");
+} catch {
+  // la columna ya existe
+}
+
 module.exports = db;

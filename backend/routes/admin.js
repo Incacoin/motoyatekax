@@ -26,7 +26,7 @@ router.post("/admin/login", (req, res) => {
 });
 
 router.post("/admin/drivers", checkAdminPin, (req, res) => {
-  const { name, phone, vehicle } = req.body;
+  const { name, phone, vehicle, tipo } = req.body;
   if (!name || !phone) {
     return res.status(400).json({ error: "Falta nombre o teléfono" });
   }
@@ -34,12 +34,12 @@ router.post("/admin/drivers", checkAdminPin, (req, res) => {
   const pin = generateDriverPin();
   const result = db
     .prepare(
-      "INSERT INTO drivers (name, phone, vehicle, pin) VALUES (?, ?, ?, ?)"
+      "INSERT INTO drivers (name, phone, vehicle, pin, tipo) VALUES (?, ?, ?, ?, ?)"
     )
-    .run(name, phone, vehicle || null, pin);
+    .run(name, phone, vehicle || null, pin, tipo === "formal" ? "formal" : "informal");
 
   const driver = db
-    .prepare("SELECT id, name, phone, vehicle, pin, status FROM drivers WHERE id = ?")
+    .prepare("SELECT id, name, phone, vehicle, pin, status, tipo FROM drivers WHERE id = ?")
     .get(result.lastInsertRowid);
 
   res.status(201).json(driver);
@@ -48,7 +48,7 @@ router.post("/admin/drivers", checkAdminPin, (req, res) => {
 router.post("/admin/drivers/list", checkAdminPin, (req, res) => {
   const drivers = db
     .prepare(
-      "SELECT id, name, phone, vehicle, pin, status, last_seen, paid_until, vouched_by, vouched_at, created_at FROM drivers WHERE deleted_at IS NULL ORDER BY created_at DESC"
+      "SELECT id, name, phone, vehicle, pin, status, last_seen, paid_until, vouched_by, vouched_at, tipo, created_at FROM drivers WHERE deleted_at IS NULL ORDER BY created_at DESC"
     )
     .all();
   res.json(drivers);
@@ -75,18 +75,18 @@ router.post("/admin/drivers/:id/vouch", checkAdminPin, (req, res) => {
 });
 
 router.post("/admin/drivers/:id/update", checkAdminPin, (req, res) => {
-  const { name, phone, vehicle } = req.body;
+  const { name, phone, vehicle, tipo } = req.body;
   if (!name || !phone) {
     return res.status(400).json({ error: "Falta nombre o teléfono" });
   }
 
   db.prepare(
-    "UPDATE drivers SET name = ?, phone = ?, vehicle = ? WHERE id = ?"
-  ).run(name, phone, vehicle || null, req.params.id);
+    "UPDATE drivers SET name = ?, phone = ?, vehicle = ?, tipo = ? WHERE id = ?"
+  ).run(name, phone, vehicle || null, tipo === "formal" ? "formal" : "informal", req.params.id);
 
   const driver = db
     .prepare(
-      "SELECT id, name, phone, vehicle, pin, status, last_seen, paid_until, created_at FROM drivers WHERE id = ?"
+      "SELECT id, name, phone, vehicle, pin, status, last_seen, paid_until, tipo, created_at FROM drivers WHERE id = ?"
     )
     .get(req.params.id);
   res.json(driver);
