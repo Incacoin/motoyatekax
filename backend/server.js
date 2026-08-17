@@ -13,7 +13,7 @@ const adminRoutes = require("./routes/admin");
 const realtime = require("./realtime");
 
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: "5mb" }));
 
 app.use(express.static(path.join(__dirname, "..", "frontend")));
 
