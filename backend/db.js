@@ -40,6 +40,7 @@ db.exec(`
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
     phone TEXT NOT NULL,
+    photo TEXT,
     status TEXT NOT NULL DEFAULT 'pendiente',
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
@@ -83,6 +84,12 @@ try {
 
 try {
   db.exec("ALTER TABLE drivers ADD COLUMN tipo TEXT NOT NULL DEFAULT 'informal'");
+} catch {
+  // la columna ya existe
+}
+
+try {
+  db.exec("ALTER TABLE driver_applications ADD COLUMN photo TEXT");
 } catch {
   // la columna ya existe
 }
