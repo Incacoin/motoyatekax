@@ -105,6 +105,7 @@ input:focus {
   letter-spacing: 0.01em;
 }
 .credit strong { color: var(--accent); font-weight: 700; }
+.credit a { color: var(--text-faint); text-decoration: underline; }
 
 .toast {
   position: fixed;

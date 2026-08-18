@@ -19,6 +19,9 @@
   .fieldHint { font-size: 12.5px; color: var(--text-dim); line-height: 1.45; margin: 0 0 8px; }
   #photoPreview { display: none; width: 100%; max-height: 220px; object-fit: cover; border-radius: var(--radius-sm); margin-top: 10px; border: 1px solid var(--border); }
   #err { color: var(--danger); min-height: 18px; font-size: 13.5px; margin-top: 4px; }
+  .legalCheck { display: flex; align-items: flex-start; gap: 8px; font-size: 12.5px; color: var(--text-dim); line-height: 1.5; cursor: pointer; }
+  .legalCheck input { margin-top: 3px; flex-shrink: 0; }
+  .legalCheck a { color: var(--accent); }
   #okScreen { display: none; padding: 26px 20px; text-align: center; }
   #okScreen .big { font-size: 38px; }
   #okScreen h2 { color: var(--accent); font-size: 19px; margin: 10px 0 6px; }
@@ -50,6 +53,12 @@
       <p class="fieldHint">Así verificamos que eres un chofer real y evitamos perfiles falsos.</p>
       <input type="file" id="photo" accept="image/*" capture="environment" onchange="handlePhoto(event)" />
       <img id="photoPreview" />
+    </div>
+    <div class="field legalField">
+      <label class="legalCheck">
+        <input type="checkbox" id="acceptLegal" />
+        He leído y acepto el <a href="aviso-legal.html" target="_blank" rel="noopener">Aviso Legal de MotoYaTekax</a>. Entiendo que opero como conductor independiente, bajo mi propia responsabilidad.
+      </label>
     </div>
     <button class="btn" onclick="submitApplication()">Quiero ser chofer</button>
     <div id="err"></div>
@@ -117,11 +126,15 @@ async function submitApplication() {
     err.textContent = "Tómate una foto contigo y tu moto";
     return;
   }
+  if (!document.getElementById("acceptLegal").checked) {
+    err.textContent = "Debes aceptar el aviso legal para continuar";
+    return;
+  }
 
   const res = await fetch("/api/chofer-solicitudes", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name, phone, photo: photoDataUrl }),
+    body: JSON.stringify({ name, phone, photo: photoDataUrl, acceptedLegal: true }),
   });
   if (!res.ok) {
     err.textContent = "No se pudo enviar, intenta de nuevo";

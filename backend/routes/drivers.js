@@ -33,17 +33,20 @@ router.post("/drivers/login", (req, res) => {
   res.json({ ...driver, todayCount });
 });
 
+const AVISO_LEGAL_VERSION = "2026-08-18";
+
 router.post("/chofer-solicitudes", (req, res) => {
-  const { name, phone, photo } = req.body;
+  const { name, phone, photo, acceptedLegal } = req.body;
   if (!name || !phone || !photo) {
     return res.status(400).json({ error: "Falta nombre, teléfono o foto" });
   }
+  if (!acceptedLegal) {
+    return res.status(400).json({ error: "Debes aceptar el aviso legal para continuar" });
+  }
 
-  db.prepare("INSERT INTO driver_applications (name, phone, photo) VALUES (?, ?, ?)").run(
-    name,
-    phone,
-    photo
-  );
+  db.prepare(
+    "INSERT INTO driver_applications (name, phone, photo, accepted_legal_at, accepted_legal_version) VALUES (?, ?, ?, datetime('now'), ?)"
+  ).run(name, phone, photo, AVISO_LEGAL_VERSION);
   res.status(201).json({ ok: true });
 });
 
