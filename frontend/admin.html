@@ -103,6 +103,10 @@
       <div class="label">Choferes conectados ahora</div>
       <div class="value" id="statDriversOnline">—</div>
     </div>
+    <div class="card stat-tile accent">
+      <div class="label">Satisfacción (viajes calificados)</div>
+      <div class="value" id="statSatisfaction">—</div>
+    </div>
   </div>
   <div id="topDriversWrap">
     <p class="section-hint" style="margin-bottom:10px;">Choferes más activos (7 días)</p>
@@ -314,6 +318,8 @@ async function loadStats() {
   document.getElementById("statRidesWeek").textContent = s.ridesWeek;
   document.getElementById("statCancelledToday").textContent = s.cancelledToday;
   document.getElementById("statDriversOnline").textContent = s.driversOnline;
+  document.getElementById("statSatisfaction").textContent =
+    s.satisfactionPct === null ? "—" : `${s.satisfactionPct}% (${s.ratedCount})`;
 
   const max = Math.max(1, ...s.topDrivers.map((d) => d.rides));
   document.getElementById("topDrivers").innerHTML = s.topDrivers.length
@@ -526,6 +532,7 @@ function renderRideRows(rides) {
     const disconnected = r.driver_disconnected_at
       ? `<br><span class="ago" style="color:var(--danger);">⚠ desconectado ${timeAgo(r.driver_disconnected_at)}</span>`
       : "";
+    const rating = r.rating === 1 ? " 👍" : r.rating === 0 ? " 👎" : "";
     return `
     <tr>
       <td>${r.rider_name}<br><span class="ago">${r.rider_phone}</span></td>
@@ -533,7 +540,7 @@ function renderRideRows(rides) {
       <td>${r.pickup_label || "—"}</td>
       <td>${r.dest_label || "—"}</td>
       <td>${r.passengers}</td>
-      <td><span class="dot ${r.status}"></span>${RIDE_STATUS_LABEL[r.status] || r.status}</td>
+      <td><span class="dot ${r.status}"></span>${RIDE_STATUS_LABEL[r.status] || r.status}${rating}</td>
       <td class="ago">${timeAgo(r.updated_at)}</td>
     </tr>`;
   }).join("") || `<tr><td colspan="7" class="ago">Sin viajes todavía.</td></tr>`;

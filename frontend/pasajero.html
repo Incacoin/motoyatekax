@@ -37,6 +37,10 @@
   #driverCard { padding: 18px; width: 280px; }
   #driverCard .name { font-size: 18px; font-weight: 700; }
   #driverCard .meta { color: var(--text-dim); margin-top: 4px; font-size: 14px; }
+  #ratingBox { padding: 18px; text-align: center; }
+  .ratingQuestion { margin: 0 0 12px; font-size: 15px; }
+  .ratingButtons { display: flex; gap: 10px; justify-content: center; }
+  .ratingButtons .btn { width: auto; padding: 10px 20px; }
   #statusMap { width: 100%; height: 40vh; border-radius: var(--radius-lg); overflow: hidden; border: 1px solid var(--border); }
   #connWarning { display: none; color: var(--danger); font-size: 13.5px; text-align: center; }
   #chatBox { display: none; flex-direction: column; gap: 8px; padding: 14px; width: 280px; }
@@ -96,6 +100,13 @@
     </div>
   </div>
   <button class="btn btn-secondary" id="cancelBtn" onclick="cancelRide()">Cancelar</button>
+  <div id="ratingBox" class="card fade-in" style="display:none;">
+    <p class="ratingQuestion">¿Tuviste buen servicio?</p>
+    <div class="ratingButtons">
+      <button class="btn btn-secondary" onclick="rateRide(1)">👍 Sí</button>
+      <button class="btn btn-secondary" onclick="rateRide(0)">👎 No</button>
+    </div>
+  </div>
   <button class="btn" id="newRideBtn" style="display:none;" onclick="location.reload()">Pedir otro viaje</button>
   <div class="credit">⚡ Tecnología de <strong>Lealtad Digital</strong> · <a href="aviso-legal.html" target="_blank" rel="noopener">Aviso legal</a></div>
 </div>
@@ -420,6 +431,22 @@ function onCompleted() {
   document.getElementById("chatBox").style.display = "none";
   document.getElementById("cancelBtn").style.display = "none";
   document.getElementById("newRideBtn").style.display = "inline-block";
+  document.getElementById("ratingBox").style.display = "block";
+}
+
+async function rateRide(rating) {
+  if (!ride) return;
+  const res = await fetch(API + `/api/rides/${ride.id}/rate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ rating }),
+  });
+  const box = document.getElementById("ratingBox");
+  if (!res.ok) {
+    box.innerHTML = '<p class="ratingQuestion">No se pudo enviar tu calificación</p>';
+    return;
+  }
+  box.innerHTML = '<p class="ratingQuestion">¡Gracias por tu opinión! 🙏</p>';
 }
 
 function onCancelledByDriver() {

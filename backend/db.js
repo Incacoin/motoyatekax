@@ -106,4 +106,10 @@ try {
   // la columna ya existe
 }
 
+try {
+  db.exec("ALTER TABLE rides ADD COLUMN rating INTEGER");
+} catch {
+  // la columna ya existe
+}
+
 module.exports = db;

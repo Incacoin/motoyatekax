@@ -180,4 +180,24 @@ router.post("/rides/:id/cancel", (req, res) => {
   res.json({ ok: true });
 });
 
+router.post("/rides/:id/rate", (req, res) => {
+  const rideId = Number(req.params.id);
+  const { rating } = req.body;
+  if (rating !== 0 && rating !== 1) {
+    return res.status(400).json({ error: "Calificación inválida" });
+  }
+
+  const result = db
+    .prepare(
+      "UPDATE rides SET rating = ? WHERE id = ? AND status = 'completado' AND rating IS NULL"
+    )
+    .run(rating, rideId);
+
+  if (result.changes === 0) {
+    return res.status(409).json({ error: "Este viaje ya fue calificado o no se puede calificar" });
+  }
+
+  res.json({ ok: true });
+});
+
 module.exports = router;
