@@ -1,5 +1,6 @@
 const express = require("express");
 const db = require("../db");
+const { AVISO_LEGAL_VERSION } = require("../constants");
 
 const router = express.Router();
 
@@ -26,9 +27,12 @@ router.post("/admin/login", (req, res) => {
 });
 
 router.post("/admin/drivers", checkAdminPin, (req, res) => {
-  const { name, phone, vehicle, tipo } = req.body;
+  const { name, phone, vehicle, tipo, acceptedLegal } = req.body;
   if (!name || !phone) {
     return res.status(400).json({ error: "Falta nombre o teléfono" });
+  }
+  if (!acceptedLegal) {
+    return res.status(400).json({ error: "Confirma que el chofer aceptó el aviso legal" });
   }
 
   const existing = db
@@ -43,9 +47,9 @@ router.post("/admin/drivers", checkAdminPin, (req, res) => {
   const pin = generateDriverPin();
   const result = db
     .prepare(
-      "INSERT INTO drivers (name, phone, vehicle, pin, tipo) VALUES (?, ?, ?, ?, ?)"
+      "INSERT INTO drivers (name, phone, vehicle, pin, tipo, accepted_legal_at, accepted_legal_version) VALUES (?, ?, ?, ?, ?, datetime('now'), ?)"
     )
-    .run(name, phone, vehicle || null, pin, tipo === "formal" ? "formal" : "informal");
+    .run(name, phone, vehicle || null, pin, tipo === "formal" ? "formal" : "informal", AVISO_LEGAL_VERSION);
 
   const driver = db
     .prepare("SELECT id, name, phone, vehicle, pin, status, tipo FROM drivers WHERE id = ?")

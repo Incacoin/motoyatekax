@@ -112,4 +112,16 @@ try {
   // la columna ya existe
 }
 
+try {
+  db.exec("ALTER TABLE drivers ADD COLUMN accepted_legal_at TEXT");
+} catch {
+  // la columna ya existe
+}
+
+try {
+  db.exec("ALTER TABLE drivers ADD COLUMN accepted_legal_version TEXT");
+} catch {
+  // la columna ya existe
+}
+
 module.exports = db;

@@ -1,5 +1,6 @@
 const express = require("express");
 const db = require("../db");
+const { AVISO_LEGAL_VERSION } = require("../constants");
 
 const router = express.Router();
 
@@ -32,8 +33,6 @@ router.post("/drivers/login", (req, res) => {
 
   res.json({ ...driver, todayCount });
 });
-
-const AVISO_LEGAL_VERSION = "2026-08-18";
 
 router.post("/chofer-solicitudes", (req, res) => {
   const { name, phone, photo, acceptedLegal } = req.body;
