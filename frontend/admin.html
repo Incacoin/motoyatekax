@@ -386,11 +386,15 @@ async function saveEdit(id) {
     showToast("Escribe nombre y teléfono");
     return;
   }
-  await fetch(API + `/api/admin/drivers/${id}/update`, {
+  const res = await fetch(API + `/api/admin/drivers/${id}/update`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ adminPin, name, phone, vehicle, tipo }),
   });
+  if (!res.ok) {
+    showToast((await res.json()).error || "No se pudo guardar");
+    return;
+  }
   editingId = null;
   loadDrivers();
 }

@@ -31,6 +31,15 @@ router.post("/admin/drivers", checkAdminPin, (req, res) => {
     return res.status(400).json({ error: "Falta nombre o teléfono" });
   }
 
+  const existing = db
+    .prepare("SELECT id, name FROM drivers WHERE phone = ? AND deleted_at IS NULL")
+    .get(phone);
+  if (existing) {
+    return res.status(409).json({
+      error: `Ese teléfono ya está registrado con el chofer "${existing.name}"`,
+    });
+  }
+
   const pin = generateDriverPin();
   const result = db
     .prepare(
@@ -78,6 +87,15 @@ router.post("/admin/drivers/:id/update", checkAdminPin, (req, res) => {
   const { name, phone, vehicle, tipo } = req.body;
   if (!name || !phone) {
     return res.status(400).json({ error: "Falta nombre o teléfono" });
+  }
+
+  const existing = db
+    .prepare("SELECT id, name FROM drivers WHERE phone = ? AND deleted_at IS NULL AND id != ?")
+    .get(phone, req.params.id);
+  if (existing) {
+    return res.status(409).json({
+      error: `Ese teléfono ya está registrado con el chofer "${existing.name}"`,
+    });
   }
 
   db.prepare(
