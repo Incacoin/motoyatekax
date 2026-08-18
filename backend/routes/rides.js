@@ -55,7 +55,7 @@ router.get("/rides/:id", (req, res) => {
   if (ride.driver_id) {
     ride.driver = db
       .prepare(
-        "SELECT id, name, phone, vehicle, lat, lng FROM drivers WHERE id = ?"
+        "SELECT id, name, phone, vehicle, lat, lng, photo FROM drivers WHERE id = ?"
       )
       .get(ride.driver_id);
   }
@@ -84,7 +84,7 @@ router.post("/rides/:id/accept", (req, res) => {
   const ride = db.prepare("SELECT * FROM rides WHERE id = ?").get(rideId);
   const driver = db
     .prepare(
-      "SELECT id, name, phone, vehicle, lat, lng FROM drivers WHERE id = ?"
+      "SELECT id, name, phone, vehicle, lat, lng, photo FROM drivers WHERE id = ?"
     )
     .get(driverId);
 

@@ -27,7 +27,7 @@ router.post("/admin/login", (req, res) => {
 });
 
 router.post("/admin/drivers", checkAdminPin, (req, res) => {
-  const { name, phone, vehicle, tipo, acceptedLegal } = req.body;
+  const { name, phone, vehicle, tipo, acceptedLegal, photo } = req.body;
   if (!name || !phone) {
     return res.status(400).json({ error: "Falta nombre o teléfono" });
   }
@@ -47,12 +47,12 @@ router.post("/admin/drivers", checkAdminPin, (req, res) => {
   const pin = generateDriverPin();
   const result = db
     .prepare(
-      "INSERT INTO drivers (name, phone, vehicle, pin, tipo, accepted_legal_at, accepted_legal_version) VALUES (?, ?, ?, ?, ?, datetime('now'), ?)"
+      "INSERT INTO drivers (name, phone, vehicle, pin, tipo, accepted_legal_at, accepted_legal_version, photo) VALUES (?, ?, ?, ?, ?, datetime('now'), ?, ?)"
     )
-    .run(name, phone, vehicle || null, pin, tipo === "formal" ? "formal" : "informal", AVISO_LEGAL_VERSION);
+    .run(name, phone, vehicle || null, pin, tipo === "formal" ? "formal" : "informal", AVISO_LEGAL_VERSION, photo || null);
 
   const driver = db
-    .prepare("SELECT id, name, phone, vehicle, pin, status, tipo FROM drivers WHERE id = ?")
+    .prepare("SELECT id, name, phone, vehicle, pin, status, tipo, photo FROM drivers WHERE id = ?")
     .get(result.lastInsertRowid);
 
   res.status(201).json(driver);
@@ -61,7 +61,7 @@ router.post("/admin/drivers", checkAdminPin, (req, res) => {
 router.post("/admin/drivers/list", checkAdminPin, (req, res) => {
   const drivers = db
     .prepare(
-      "SELECT id, name, phone, vehicle, pin, status, last_seen, paid_until, vouched_by, vouched_at, tipo, created_at FROM drivers WHERE deleted_at IS NULL ORDER BY created_at DESC"
+      "SELECT id, name, phone, vehicle, pin, status, last_seen, paid_until, vouched_by, vouched_at, tipo, photo, created_at FROM drivers WHERE deleted_at IS NULL ORDER BY created_at DESC"
     )
     .all();
   res.json(drivers);

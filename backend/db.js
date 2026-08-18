@@ -124,4 +124,10 @@ try {
   // la columna ya existe
 }
 
+try {
+  db.exec("ALTER TABLE drivers ADD COLUMN photo TEXT");
+} catch {
+  // la columna ya existe
+}
+
 module.exports = db;
