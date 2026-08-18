@@ -35,12 +35,21 @@ router.post("/admin/drivers", checkAdminPin, (req, res) => {
     return res.status(400).json({ error: "Confirma que el chofer aceptó el aviso legal" });
   }
 
-  const existing = db
+  const existingPhone = db
     .prepare("SELECT id, name FROM drivers WHERE phone = ? AND deleted_at IS NULL")
     .get(phone);
-  if (existing) {
+  if (existingPhone) {
     return res.status(409).json({
-      error: `Ese teléfono ya está registrado con el chofer "${existing.name}"`,
+      error: `Ese teléfono ya está registrado con el chofer "${existingPhone.name}"`,
+    });
+  }
+
+  const existingName = db
+    .prepare("SELECT id FROM drivers WHERE lower(trim(name)) = lower(trim(?)) AND deleted_at IS NULL")
+    .get(name);
+  if (existingName) {
+    return res.status(409).json({
+      error: `Ya hay un chofer registrado con el nombre "${name}"`,
     });
   }
 
@@ -93,12 +102,21 @@ router.post("/admin/drivers/:id/update", checkAdminPin, (req, res) => {
     return res.status(400).json({ error: "Falta nombre o teléfono" });
   }
 
-  const existing = db
+  const existingPhone = db
     .prepare("SELECT id, name FROM drivers WHERE phone = ? AND deleted_at IS NULL AND id != ?")
     .get(phone, req.params.id);
-  if (existing) {
+  if (existingPhone) {
     return res.status(409).json({
-      error: `Ese teléfono ya está registrado con el chofer "${existing.name}"`,
+      error: `Ese teléfono ya está registrado con el chofer "${existingPhone.name}"`,
+    });
+  }
+
+  const existingName = db
+    .prepare("SELECT id FROM drivers WHERE lower(trim(name)) = lower(trim(?)) AND deleted_at IS NULL AND id != ?")
+    .get(name, req.params.id);
+  if (existingName) {
+    return res.status(409).json({
+      error: `Ya hay un chofer registrado con el nombre "${name}"`,
     });
   }
 

@@ -21,6 +21,9 @@
   #form { align-items: center; justify-content: center; gap: 14px; padding: 24px; text-align: center; }
   #form input { width: 260px; }
   #formError { color: var(--danger); font-size: 14px; min-height: 18px; }
+  .installBanner { position: absolute; top: 14px; left: 14px; right: 14px; padding: 12px 14px; display: flex; align-items: center; gap: 10px; text-align: left; font-size: 13.5px; }
+  .installBanner #installText { flex: 1; color: var(--text); line-height: 1.4; }
+  .installClose { background: none; border: none; color: var(--text-faint); font-size: 15px; cursor: pointer; padding: 4px; flex-shrink: 0; }
   .btn:disabled { opacity: 0.4; }
   #map { flex: 1; min-height: 0; }
   #pickBar { padding: 12px; background: var(--bg-panel); border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 10px; }
@@ -59,10 +62,15 @@
 <body>
 
 <div id="form" class="screen active">
+  <div id="installBanner" class="card installBanner" style="display:none;">
+    <div id="installText"></div>
+    <button class="btn-sm" id="installBtn" onclick="installApp()" style="display:none;">Instalar app</button>
+    <button class="installClose" onclick="dismissInstallBanner()">✕</button>
+  </div>
   <div class="brand"><span class="brand-icon">🛵</span>MotoYaTekax</div>
   <div style="color:var(--text-dim);">Pide tu mototaxi</div>
   <input id="nameInput" placeholder="Tu nombre" />
-  <input id="phoneInput" placeholder="Tu teléfono" inputmode="tel" />
+  <input id="phoneInput" placeholder="Tu teléfono" inputmode="numeric" maxlength="10" oninput="this.value = this.value.replace(/\D/g, '')" />
   <button class="btn" onclick="goToMap()">Continuar</button>
   <div id="formError"></div>
   <div class="credit" style="position:absolute;bottom:18px;">⚡ Tecnología de <strong>Lealtad Digital</strong> · <a href="aviso-legal.html" target="_blank" rel="noopener">Aviso legal</a></div>
@@ -116,6 +124,49 @@
 
 <script>
 const API = "";
+let deferredInstallPrompt = null;
+
+function isStandalone() {
+  return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+}
+
+function isIOS() {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent);
+}
+
+function initInstallBanner() {
+  if (isStandalone() || localStorage.getItem("motoya_install_dismissed")) return;
+  const banner = document.getElementById("installBanner");
+  const text = document.getElementById("installText");
+  if (isIOS()) {
+    text.textContent = "📲 Instala MotoYaTekax: toca Compartir y luego \"Agregar a pantalla de inicio\".";
+    banner.style.display = "flex";
+  } else {
+    window.addEventListener("beforeinstallprompt", (e) => {
+      e.preventDefault();
+      deferredInstallPrompt = e;
+      text.textContent = "📲 Instala MotoYaTekax en tu celular para pedir tu mototaxi más rápido.";
+      document.getElementById("installBtn").style.display = "inline-block";
+      banner.style.display = "flex";
+    });
+  }
+}
+
+async function installApp() {
+  if (!deferredInstallPrompt) return;
+  deferredInstallPrompt.prompt();
+  await deferredInstallPrompt.userChoice;
+  deferredInstallPrompt = null;
+  dismissInstallBanner();
+}
+
+function dismissInstallBanner() {
+  document.getElementById("installBanner").style.display = "none";
+  localStorage.setItem("motoya_install_dismissed", "1");
+}
+
+initInstallBanner();
+
 let map, statusMap;
 let pickup = null, dest = null;
 let pickupMarker = null, destMarker = null;
