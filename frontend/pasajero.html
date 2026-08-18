@@ -69,7 +69,7 @@
   </div>
   <div class="brand"><span class="brand-icon">🛵</span>MotoYaTekax</div>
   <div style="color:var(--text-dim);">Pide tu mototaxi</div>
-  <input id="nameInput" placeholder="Tu nombre" />
+  <input id="nameInput" placeholder="Tu nombre" oninput="this.value = this.value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s'-]/g, '')" />
   <input id="phoneInput" placeholder="Tu teléfono" inputmode="numeric" maxlength="10" oninput="this.value = this.value.replace(/\D/g, '')" />
   <button class="btn" onclick="goToMap()">Continuar</button>
   <div id="formError"></div>
