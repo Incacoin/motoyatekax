@@ -19,6 +19,9 @@
   #login { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; gap: 16px; padding: 24px; text-align: center; }
   #login input { font-size: 26px; padding: 14px; text-align: center; letter-spacing: 6px; width: 200px; }
   #loginError { color: var(--danger); min-height: 18px; font-size: 14px; }
+  .installBanner { position: absolute; top: 14px; left: 14px; right: 14px; padding: 12px 14px; display: flex; align-items: center; gap: 10px; text-align: left; font-size: 13.5px; }
+  .installBanner #installText { flex: 1; color: var(--text); line-height: 1.4; }
+  .installClose { background: none; border: none; color: var(--text-faint); font-size: 15px; cursor: pointer; padding: 4px; flex-shrink: 0; }
   #app { display: none; flex-direction: column; height: 100vh; }
   #topbar { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: var(--bg-panel); border-bottom: 1px solid var(--border); }
   #topbar .name { font-weight: 700; }
@@ -54,6 +57,11 @@
 <body>
 
 <div id="login">
+  <div id="installBanner" class="card installBanner" style="display:none;">
+    <div id="installText"></div>
+    <button class="btn-sm" id="installBtn" onclick="installApp()" style="display:none;">Instalar app</button>
+    <button class="installClose" onclick="dismissInstallBanner()">✕</button>
+  </div>
   <div class="brand"><span class="brand-icon">🛵</span>MotoYaTekax</div>
   <div style="color:var(--text-dim);">Ingresa tu PIN de chofer</div>
   <input id="pinInput" inputmode="numeric" maxlength="6" placeholder="••••" />
@@ -95,6 +103,49 @@
 
 <script>
 const API = "";
+let deferredInstallPrompt = null;
+
+function isStandalone() {
+  return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+}
+
+function isIOS() {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent);
+}
+
+function initInstallBanner() {
+  if (isStandalone() || localStorage.getItem("motoya_chofer_install_dismissed")) return;
+  const banner = document.getElementById("installBanner");
+  const text = document.getElementById("installText");
+  if (isIOS()) {
+    text.textContent = "📲 Instala MotoYaTekax Chofer: toca Compartir y luego \"Agregar a pantalla de inicio\".";
+    banner.style.display = "flex";
+  } else {
+    window.addEventListener("beforeinstallprompt", (e) => {
+      e.preventDefault();
+      deferredInstallPrompt = e;
+      text.textContent = "📲 Instala la app para recibir viajes más rápido, sin abrir el navegador.";
+      document.getElementById("installBtn").style.display = "inline-block";
+      banner.style.display = "flex";
+    });
+  }
+}
+
+async function installApp() {
+  if (!deferredInstallPrompt) return;
+  deferredInstallPrompt.prompt();
+  await deferredInstallPrompt.userChoice;
+  deferredInstallPrompt = null;
+  dismissInstallBanner();
+}
+
+function dismissInstallBanner() {
+  document.getElementById("installBanner").style.display = "none";
+  localStorage.setItem("motoya_chofer_install_dismissed", "1");
+}
+
+initInstallBanner();
+
 let driver = null;
 let ws = null;
 let map, myMarker, routeLine;
