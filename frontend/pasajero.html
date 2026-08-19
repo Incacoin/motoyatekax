@@ -30,6 +30,8 @@
   #pickBar .row { display: flex; gap: 8px; align-items: center; justify-content: space-between; }
   #pickBar .row .btn-secondary { flex: 1; }
   #pickBar .hint { font-size: 13.5px; color: var(--text-dim); text-align: center; }
+  .service-tab { flex: 1; padding: 10px 8px; font-size: 13.5px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-card); color: var(--text-dim); cursor: pointer; }
+  .service-tab.active { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
   #referenceInput { width: 100%; }
   .stepper { display: flex; align-items: center; gap: 12px; }
   .stepper .btn-sm { width: 34px; height: 34px; font-size: 18px; display: flex; align-items: center; justify-content: center; padding: 0; }
@@ -80,6 +82,10 @@
 <div id="mapScreen" class="screen">
   <div id="map"></div>
   <div id="pickBar">
+    <div class="row" id="serviceTypeRow" style="gap:8px;">
+      <button class="btn btn-sm service-tab active" id="tabMoto" onclick="setServiceType('moto')">🛵 Moto</button>
+      <button class="btn btn-sm service-tab" id="tabTaxi" onclick="setServiceType('taxi')">🚕 Taxi (viajes largos)</button>
+    </div>
     <div class="hint" id="pickHint">Toca el mapa para marcar dónde te recogemos</div>
     <div class="row">
       <button class="btn btn-secondary" onclick="useMyLocation()">Usar mi ubicación</button>
@@ -179,6 +185,7 @@ let routeLine = null;
 let routeRefreshInterval = null;
 let currentRideStatus = "buscando";
 let passengers = 1;
+let serviceType = "moto";
 
 async function fetchRoute(from, to) {
   const url = `https://router.project-osrm.org/route/v1/driving/${from.lng},${from.lat};${to.lng},${to.lat}?overview=full&geometries=geojson`;
@@ -261,6 +268,10 @@ function changePassengers(delta) {
 function updateFareEstimate() {
   const el = document.getElementById("fareEstimate");
   if (!pickup) { el.textContent = ""; return; }
+  if (serviceType === "taxi") {
+    el.textContent = "Viaje foráneo: acuerda el precio directo con el chofer";
+    return;
+  }
   let pricePerPerson = FARE_NORMAL;
   let approx = true;
   if (dest) {
@@ -270,6 +281,16 @@ function updateFareEstimate() {
   }
   const total = pricePerPerson * passengers;
   el.textContent = `Tarifa estimada: $${total} MXN (${passengers} pasajero${passengers > 1 ? "s" : ""})${approx ? " · aprox., marca destino para afinar" : ""}`;
+}
+
+function setServiceType(type) {
+  if (serviceType === type) return;
+  serviceType = type;
+  document.getElementById("tabMoto").classList.toggle("active", type === "moto");
+  document.getElementById("tabTaxi").classList.toggle("active", type === "taxi");
+  document.getElementById("requestBtn").textContent = type === "taxi" ? "Pedir taxi" : "Pedir mototaxi";
+  updateFareEstimate();
+  if (map) startAvailableDriversPolling();
 }
 
 function numberedIcon(num, color) {
@@ -290,22 +311,32 @@ function motoIcon() {
   });
 }
 
+function taxiIcon() {
+  return L.divIcon({
+    className: "",
+    html: `<div style="background:#14161c;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,.4);border:2px solid #f6a623;font-size:17px;">🚕</div>`,
+    iconSize: [32, 32],
+    iconAnchor: [16, 16],
+  });
+}
+
 let availableDriverMarkers = new Map();
 let availableDriversPollTimer = null;
 let didFitAvailableDrivers = false;
 
 async function loadAvailableDrivers() {
-  const res = await fetch(API + "/api/drivers/available");
+  const res = await fetch(API + `/api/drivers/available?type=${serviceType}`);
   if (!res.ok) return;
   const drivers = await res.json();
   const seen = new Set();
+  const icon = serviceType === "taxi" ? taxiIcon() : motoIcon();
   for (const d of drivers) {
     seen.add(d.id);
     const pos = [d.lat, d.lng];
     if (availableDriverMarkers.has(d.id)) {
       availableDriverMarkers.get(d.id).setLatLng(pos);
     } else {
-      availableDriverMarkers.set(d.id, L.marker(pos, { icon: motoIcon() }).addTo(map).bindPopup(d.name));
+      availableDriverMarkers.set(d.id, L.marker(pos, { icon }).addTo(map).bindPopup(d.name));
     }
   }
   for (const [id, marker] of availableDriverMarkers) {
@@ -424,6 +455,7 @@ async function requestRide() {
       dest_lat: dest ? dest.lat : null,
       dest_lng: dest ? dest.lng : null,
       passengers,
+      ride_type: serviceType,
     }),
   });
   ride = await res.json();

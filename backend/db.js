@@ -130,4 +130,22 @@ try {
   // la columna ya existe
 }
 
+try {
+  db.exec("ALTER TABLE drivers ADD COLUMN vehicle_type TEXT NOT NULL DEFAULT 'moto'");
+} catch {
+  // la columna ya existe
+}
+
+try {
+  db.exec("ALTER TABLE rides ADD COLUMN ride_type TEXT NOT NULL DEFAULT 'moto'");
+} catch {
+  // la columna ya existe
+}
+
+try {
+  db.exec("ALTER TABLE driver_applications ADD COLUMN vehicle_type TEXT NOT NULL DEFAULT 'moto'");
+} catch {
+  // la columna ya existe
+}
+
 module.exports = db;

@@ -49,7 +49,14 @@
       </div>
     </div>
     <div class="field">
-      <label>Foto contigo y tu moto</label>
+      <label>¿Con qué vehículo trabajas?</label>
+      <select id="vehicleType">
+        <option value="moto">🛵 Moto (viajes cortos)</option>
+        <option value="taxi">🚕 Taxi / carro (viajes largos)</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Foto contigo y tu vehículo</label>
       <p class="fieldHint">Así verificamos que eres un chofer real y evitamos perfiles falsos.</p>
       <input type="file" id="photo" accept="image/*" capture="environment" onchange="handlePhoto(event)" />
       <img id="photoPreview" />
@@ -131,10 +138,11 @@ async function submitApplication() {
     return;
   }
 
+  const vehicleType = document.getElementById("vehicleType").value;
   const res = await fetch("/api/chofer-solicitudes", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name, phone, photo: photoDataUrl, acceptedLegal: true }),
+    body: JSON.stringify({ name, phone, photo: photoDataUrl, acceptedLegal: true, vehicleType }),
   });
   if (!res.ok) {
     err.textContent = "No se pudo enviar, intenta de nuevo";

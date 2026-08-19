@@ -5,11 +5,18 @@ const { AVISO_LEGAL_VERSION } = require("../constants");
 const router = express.Router();
 
 router.get("/drivers/available", (req, res) => {
-  const drivers = db
-    .prepare(
-      "SELECT id, name, lat, lng FROM drivers WHERE status = 'disponible' AND lat IS NOT NULL AND lng IS NOT NULL AND deleted_at IS NULL"
-    )
-    .all();
+  const type = req.query.type === "taxi" ? "taxi" : null;
+  const drivers = type
+    ? db
+        .prepare(
+          "SELECT id, name, lat, lng, vehicle_type FROM drivers WHERE status = 'disponible' AND lat IS NOT NULL AND lng IS NOT NULL AND deleted_at IS NULL AND vehicle_type = ?"
+        )
+        .all(type)
+    : db
+        .prepare(
+          "SELECT id, name, lat, lng, vehicle_type FROM drivers WHERE status = 'disponible' AND lat IS NOT NULL AND lng IS NOT NULL AND deleted_at IS NULL AND vehicle_type = 'moto'"
+        )
+        .all();
   res.json(drivers);
 });
 
@@ -17,7 +24,7 @@ router.post("/drivers/login", (req, res) => {
   const { pin } = req.body;
   const driver = db
     .prepare(
-      "SELECT id, name, phone, vehicle, status FROM drivers WHERE pin = ? AND deleted_at IS NULL"
+      "SELECT id, name, phone, vehicle, vehicle_type, status FROM drivers WHERE pin = ? AND deleted_at IS NULL"
     )
     .get(pin);
 
@@ -35,7 +42,7 @@ router.post("/drivers/login", (req, res) => {
 });
 
 router.post("/chofer-solicitudes", (req, res) => {
-  const { name, phone, photo, acceptedLegal } = req.body;
+  const { name, phone, photo, acceptedLegal, vehicleType } = req.body;
   if (!name || !phone || !photo) {
     return res.status(400).json({ error: "Falta nombre, teléfono o foto" });
   }
@@ -44,8 +51,8 @@ router.post("/chofer-solicitudes", (req, res) => {
   }
 
   db.prepare(
-    "INSERT INTO driver_applications (name, phone, photo, accepted_legal_at, accepted_legal_version) VALUES (?, ?, ?, datetime('now'), ?)"
-  ).run(name, phone, photo, AVISO_LEGAL_VERSION);
+    "INSERT INTO driver_applications (name, phone, photo, accepted_legal_at, accepted_legal_version, vehicle_type) VALUES (?, ?, ?, datetime('now'), ?, ?)"
+  ).run(name, phone, photo, AVISO_LEGAL_VERSION, vehicleType === "taxi" ? "taxi" : "moto");
   res.status(201).json({ ok: true });
 });
 

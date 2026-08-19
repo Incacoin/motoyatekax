@@ -146,6 +146,13 @@
       <option value="formal">Formal (con placa/concesión)</option>
     </select>
   </div>
+  <div class="field">
+    <label>Servicio</label>
+    <select id="driverVehicleType" class="tipo-select">
+      <option value="moto">🛵 Moto (viajes cortos)</option>
+      <option value="taxi">🚕 Taxi (viajes largos)</option>
+    </select>
+  </div>
   <div id="pendingPhotoPreview" class="pendingPhotoPreview"></div>
   <div class="field legalField">
     <label class="legalCheck">
@@ -172,7 +179,7 @@
   <div class="table-wrap">
     <table>
       <thead>
-        <tr><th>Nombre</th><th>PIN</th><th>Teléfono</th><th>Tipo</th><th>Estado</th><th>Inscrito</th><th>Vigente hasta</th><th>Aval sindicato</th><th></th></tr>
+        <tr><th>Nombre</th><th>PIN</th><th>Teléfono</th><th>Tipo</th><th>Servicio</th><th>Estado</th><th>Inscrito</th><th>Vigente hasta</th><th>Aval sindicato</th><th></th></tr>
       </thead>
       <tbody id="driverRows"></tbody>
     </table>
@@ -183,7 +190,7 @@
   <div class="table-wrap">
     <table>
       <thead>
-        <tr><th>Pasajero</th><th>Chofer</th><th>Origen</th><th>Destino</th><th>Pax</th><th>Estado</th><th>Actualizado</th></tr>
+        <tr><th>Pasajero</th><th>Servicio</th><th>Chofer</th><th>Origen</th><th>Destino</th><th>Pax</th><th>Estado</th><th>Actualizado</th></tr>
       </thead>
       <tbody id="rideRows"></tbody>
     </table>
@@ -293,7 +300,7 @@ function renderApplications(apps) {
           ${a.photo ? `<img class="thumb" src="${a.photo}" onclick="window.open('${a.photo}', '_blank')" />` : ""}
           <div class="who">
             <span class="name">${a.name}</span>
-            <span class="meta">${a.phone} · ${timeAgo(a.created_at)}</span>
+            <span class="meta">${a.phone} · ${timeAgo(a.created_at)} · ${vehicleTypeBadge(a.vehicle_type)}</span>
           </div>
         </div>
         <div class="row-actions">
@@ -309,6 +316,7 @@ function useApplication(id) {
   if (!app) return;
   document.getElementById("driverName").value = app.name;
   document.getElementById("driverPhone").value = app.phone;
+  document.getElementById("driverVehicleType").value = app.vehicle_type === "taxi" ? "taxi" : "moto";
   pendingDriverPhoto = app.photo || null;
   renderPendingPhotoPreview();
   document.getElementById("driverName").scrollIntoView({ behavior: "smooth", block: "center" });
@@ -363,6 +371,7 @@ async function registerDriver() {
   const phone = document.getElementById("driverPhone").value.trim();
   const vehicle = document.getElementById("driverVehicle").value.trim();
   const tipo = document.getElementById("driverTipo").value;
+  const vehicleType = document.getElementById("driverVehicleType").value;
   document.getElementById("err2").textContent = "";
 
   if (!name || !phone) {
@@ -377,7 +386,7 @@ async function registerDriver() {
   const res = await fetch(API + "/api/admin/drivers", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ adminPin, name, phone, vehicle, tipo, acceptedLegal: true, photo: pendingDriverPhoto }),
+    body: JSON.stringify({ adminPin, name, phone, vehicle, tipo, vehicleType, acceptedLegal: true, photo: pendingDriverPhoto }),
   });
   if (!res.ok) {
     document.getElementById("err2").textContent = (await res.json()).error;
@@ -396,6 +405,7 @@ async function registerDriver() {
   document.getElementById("driverPhone").value = "";
   document.getElementById("driverVehicle").value = "";
   document.getElementById("driverTipo").value = "informal";
+  document.getElementById("driverVehicleType").value = "moto";
   document.getElementById("driverAcceptedLegal").checked = false;
 
   loadDrivers();
@@ -426,6 +436,7 @@ async function saveEdit(id) {
   const phone = document.getElementById(`edit-phone-${id}`).value.trim();
   const vehicle = document.getElementById(`edit-vehicle-${id}`).value.trim();
   const tipo = document.getElementById(`edit-tipo-${id}`).value;
+  const vehicleType = document.getElementById(`edit-vehicletype-${id}`).value;
   if (!name || !phone) {
     showToast("Escribe nombre y teléfono");
     return;
@@ -433,7 +444,7 @@ async function saveEdit(id) {
   const res = await fetch(API + `/api/admin/drivers/${id}/update`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ adminPin, name, phone, vehicle, tipo }),
+    body: JSON.stringify({ adminPin, name, phone, vehicle, tipo, vehicleType }),
   });
   if (!res.ok) {
     showToast((await res.json()).error || "No se pudo guardar");
@@ -482,6 +493,20 @@ function tipoSelect(id, tipo) {
     </select>`;
 }
 
+function vehicleTypeBadge(vehicleType) {
+  const t = vehicleType === "taxi" ? "taxi" : "moto";
+  return t === "taxi" ? `<span class="badge-tipo formal">🚕 Taxi</span>` : `<span class="badge-tipo informal">🛵 Moto</span>`;
+}
+
+function vehicleTypeSelect(id, vehicleType) {
+  const t = vehicleType === "taxi" ? "taxi" : "moto";
+  return `
+    <select id="edit-vehicletype-${id}" class="tipo-select">
+      <option value="moto" ${t === "moto" ? "selected" : ""}>🛵 Moto</option>
+      <option value="taxi" ${t === "taxi" ? "selected" : ""}>🚕 Taxi</option>
+    </select>`;
+}
+
 function renderDriverRows() {
   const rows = tipoFilter === "todos"
     ? driversCache
@@ -500,6 +525,7 @@ function renderDriverRows() {
           </div>
         </td>
         <td>${tipoSelect(d.id, d.tipo)}</td>
+        <td>${vehicleTypeSelect(d.id, d.vehicle_type)}</td>
         <td><span class="dot ${d.status}"></span>${d.status}</td>
         <td>${d.created_at ? d.created_at.slice(0, 10) : ""}</td>
         <td><input id="edit-vehicle-${d.id}" value="${d.vehicle || ""}" placeholder="Vehículo" /></td>
@@ -528,6 +554,7 @@ function renderDriverRows() {
       <td>${d.pin}</td>
       <td>${d.phone}</td>
       <td>${tipoBadge(d.tipo)}</td>
+      <td>${vehicleTypeBadge(d.vehicle_type)}</td>
       <td><span class="dot ${d.status}"></span>${d.status}</td>
       <td>${d.created_at ? d.created_at.slice(0, 10) : ""}</td>
       <td>
@@ -572,6 +599,7 @@ function renderRideRows(rides) {
     return `
     <tr>
       <td>${r.rider_name}<br><span class="ago">${r.rider_phone}</span></td>
+      <td>${vehicleTypeBadge(r.ride_type)}</td>
       <td>${r.driver_name || "—"}${disconnected}</td>
       <td>${r.pickup_label || "—"}</td>
       <td>${r.dest_label || "—"}</td>

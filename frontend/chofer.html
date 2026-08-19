@@ -228,6 +228,9 @@ const FARE_FAR = 20;
 
 function estimateFare(ride) {
   const passengers = ride.passengers || 1;
+  if (ride.ride_type === "taxi") {
+    return `Viaje foráneo · acuerda el precio con el pasajero · ${passengers} pasajero${passengers > 1 ? "s" : ""}`;
+  }
   let pricePerPerson = FARE_NORMAL;
   let approx = true;
   if (ride.dest_lat) {
@@ -273,6 +276,7 @@ function startApp() {
   document.getElementById("login").style.display = "none";
   document.getElementById("app").style.display = "flex";
   document.getElementById("driverName").textContent = driver.name;
+  document.getElementById("driverName").textContent += driver.vehicle_type === "taxi" ? " · 🚕 Taxi" : " · 🛵 Moto";
   document.getElementById("todayCountText").textContent = `Viajes hoy: ${todayCount}`;
 
   map = L.map("map").setView([20.2098, -89.4620], 14); // Ticul aprox
