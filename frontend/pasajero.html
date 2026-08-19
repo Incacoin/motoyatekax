@@ -37,6 +37,7 @@
   #fareEstimate { color: var(--accent); font-weight: 600; }
   #status { align-items: center; justify-content: center; gap: 16px; padding: 24px; text-align: center; }
   #status .big { font-size: 21px; font-weight: 700; }
+  .etaText { color: var(--accent); font-size: 14.5px; font-weight: 600; }
   #driverCard { padding: 18px; width: 280px; }
   #driverCard .name { font-size: 18px; font-weight: 700; }
   #driverCard .meta { color: var(--text-dim); margin-top: 4px; font-size: 14px; }
@@ -100,6 +101,7 @@
 
 <div id="status" class="screen">
   <div class="big" id="statusText">Buscando chofer cercano...</div>
+  <div id="etaText" class="etaText"></div>
   <div id="connWarning"></div>
   <div id="statusMap"></div>
   <div id="driverCard" class="card fade-in" style="display:none;"></div>
@@ -172,8 +174,71 @@ let pickup = null, dest = null;
 let pickupMarker = null, destMarker = null;
 let ride = null, ws = null;
 let driverMarker = null;
+let driverPos = null;
+let routeLine = null;
+let routeRefreshInterval = null;
 let currentRideStatus = "buscando";
 let passengers = 1;
+
+async function fetchRoute(from, to) {
+  const url = `https://router.project-osrm.org/route/v1/driving/${from.lng},${from.lat};${to.lng},${to.lat}?overview=full&geometries=geojson`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error("routing failed");
+  const data = await res.json();
+  const coords = data.routes[0].geometry.coordinates;
+  return { points: coords.map(([lng, lat]) => [lat, lng]), duration: data.routes[0].duration };
+}
+
+function updateEtaDisplay(durationSeconds) {
+  const el = document.getElementById("etaText");
+  if (!el) return;
+  el.textContent = durationSeconds != null ? `Llega en ~${Math.max(1, Math.round(durationSeconds / 60))} min` : "";
+}
+
+async function updateRouteLine() {
+  if (!driverPos || ["completado", "cancelado"].includes(currentRideStatus)) return;
+
+  let target = null;
+  let color = "#f6a623";
+  if (currentRideStatus === "aceptado") {
+    target = pickup;
+  } else if (currentRideStatus === "en_curso" && dest) {
+    target = dest;
+    color = "#3498db";
+  }
+
+  if (!target) {
+    if (routeLine) { statusMap.removeLayer(routeLine); routeLine = null; }
+    updateEtaDisplay(null);
+    return;
+  }
+
+  let points, duration = null;
+  try {
+    const route = await fetchRoute(driverPos, target);
+    points = route.points;
+    duration = route.duration;
+  } catch {
+    points = [[driverPos.lat, driverPos.lng], [target.lat, target.lng]];
+  }
+  if (["completado", "cancelado"].includes(currentRideStatus)) return;
+  if (routeLine) statusMap.removeLayer(routeLine);
+  routeLine = L.polyline(points, { color, weight: 4 }).addTo(statusMap);
+  updateEtaDisplay(duration);
+}
+
+function startRouteTracking() {
+  clearInterval(routeRefreshInterval);
+  updateRouteLine();
+  routeRefreshInterval = setInterval(updateRouteLine, 15000);
+}
+
+function stopRouteTracking() {
+  clearInterval(routeRefreshInterval);
+  routeRefreshInterval = null;
+  if (routeLine) { statusMap.removeLayer(routeLine); routeLine = null; }
+  updateEtaDisplay(null);
+}
 
 const FARE_THRESHOLD_KM = 3;
 const FARE_NORMAL = 15;
@@ -406,6 +471,7 @@ function connectWs() {
 }
 
 function onDriverAssigned(driver) {
+  currentRideStatus = "aceptado";
   document.getElementById("statusText").textContent = "¡Chofer en camino!";
   document.getElementById("cancelBtn").style.display = "none";
   const card = document.getElementById("driverCard");
@@ -420,7 +486,9 @@ function onDriverAssigned(driver) {
       </div>
     </div>`;
   if (driver.lat) {
+    driverPos = { lat: driver.lat, lng: driver.lng };
     driverMarker = L.marker([driver.lat, driver.lng], { icon: motoIcon() }).addTo(statusMap);
+    startRouteTracking();
   }
   document.getElementById("chatBox").style.display = "flex";
 }
@@ -428,11 +496,13 @@ function onDriverAssigned(driver) {
 function onDriverArrived() {
   currentRideStatus = "llegue";
   document.getElementById("statusText").textContent = "Tu chofer ya llegó 🛵 Sal cuando estés listo";
+  updateRouteLine();
 }
 
 function onTripStarted() {
   currentRideStatus = "en_curso";
   document.getElementById("statusText").textContent = "En camino a tu destino 🛵";
+  updateRouteLine();
 }
 
 function appendChatMessage(text, who) {
@@ -475,11 +545,13 @@ function onDriverLost() {
 }
 
 function onDriverLocation({ lat, lng }) {
+  driverPos = { lat, lng };
   if (!driverMarker) {
     driverMarker = L.marker([lat, lng], { icon: motoIcon() }).addTo(statusMap);
   } else {
     driverMarker.setLatLng([lat, lng]);
   }
+  if (!routeRefreshInterval) startRouteTracking();
 }
 
 function onCompleted() {
@@ -491,6 +563,7 @@ function onCompleted() {
   document.getElementById("cancelBtn").style.display = "none";
   document.getElementById("newRideBtn").style.display = "inline-block";
   document.getElementById("ratingBox").style.display = "block";
+  stopRouteTracking();
 }
 
 async function rateRide(rating) {
@@ -515,11 +588,13 @@ function onCancelledByDriver() {
   document.getElementById("chatBox").style.display = "none";
   document.getElementById("cancelBtn").style.display = "none";
   document.getElementById("newRideBtn").style.display = "inline-block";
+  stopRouteTracking();
 }
 
 async function cancelRide() {
   if (!ride) return;
   currentRideStatus = "cancelado";
+  stopRouteTracking();
   await fetch(API + `/api/rides/${ride.id}/cancel`, { method: "POST" });
   document.getElementById("statusText").textContent = "Viaje cancelado.";
   document.getElementById("connWarning").style.display = "none";
