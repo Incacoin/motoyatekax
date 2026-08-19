@@ -470,7 +470,30 @@ async function requestRide() {
   if (dest) L.marker([dest.lat, dest.lng], { icon: numberedIcon(2, "#3498db") }).addTo(statusMap);
 
   connectWs();
+  requestWakeLock();
 }
+
+let wakeLock = null;
+
+async function requestWakeLock() {
+  if (!("wakeLock" in navigator)) return;
+  try {
+    wakeLock = await navigator.wakeLock.request("screen");
+  } catch (e) {
+    console.warn("wake lock error", e);
+  }
+}
+
+function releaseWakeLock() {
+  if (wakeLock) { wakeLock.release(); wakeLock = null; }
+}
+
+document.addEventListener("visibilitychange", () => {
+  const rideActive = ride && !["completado", "cancelado"].includes(currentRideStatus);
+  if (rideActive && document.visibilityState === "visible" && !wakeLock) {
+    requestWakeLock();
+  }
+});
 
 function connectWs() {
   const proto = location.protocol === "https:" ? "wss" : "ws";
@@ -596,6 +619,7 @@ function onCompleted() {
   document.getElementById("newRideBtn").style.display = "inline-block";
   document.getElementById("ratingBox").style.display = "block";
   stopRouteTracking();
+  releaseWakeLock();
 }
 
 async function rateRide(rating) {
@@ -621,12 +645,14 @@ function onCancelledByDriver() {
   document.getElementById("cancelBtn").style.display = "none";
   document.getElementById("newRideBtn").style.display = "inline-block";
   stopRouteTracking();
+  releaseWakeLock();
 }
 
 async function cancelRide() {
   if (!ride) return;
   currentRideStatus = "cancelado";
   stopRouteTracking();
+  releaseWakeLock();
   await fetch(API + `/api/rides/${ride.id}/cancel`, { method: "POST" });
   document.getElementById("statusText").textContent = "Viaje cancelado.";
   document.getElementById("connWarning").style.display = "none";
