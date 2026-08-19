@@ -510,16 +510,16 @@ function onDriverAssigned(driver) {
   card.style.display = "block";
   card.innerHTML = `
     <div class="driverInfo">
-      ${driver.photo ? `<img class="driverPhoto" src="${driver.photo}" />` : `<div class="driverPhoto driverPhotoFallback">🛵</div>`}
+      ${driver.photo ? `<img class="driverPhoto" src="${driver.photo}" />` : `<div class="driverPhoto driverPhotoFallback">${serviceType === "taxi" ? "🚕" : "🛵"}</div>`}
       <div>
         <div class="name">${driver.name}</div>
-        <div class="meta">${driver.vehicle || "Mototaxi"}</div>
+        <div class="meta">${driver.vehicle || (serviceType === "taxi" ? "Taxi" : "Mototaxi")}</div>
         <div class="meta">Tel: ${driver.phone}</div>
       </div>
     </div>`;
   if (driver.lat) {
     driverPos = { lat: driver.lat, lng: driver.lng };
-    driverMarker = L.marker([driver.lat, driver.lng], { icon: motoIcon() }).addTo(statusMap);
+    driverMarker = L.marker([driver.lat, driver.lng], { icon: serviceType === "taxi" ? taxiIcon() : motoIcon() }).addTo(statusMap);
     startRouteTracking();
   }
   document.getElementById("chatBox").style.display = "flex";
@@ -527,13 +527,13 @@ function onDriverAssigned(driver) {
 
 function onDriverArrived() {
   currentRideStatus = "llegue";
-  document.getElementById("statusText").textContent = "Tu chofer ya llegó 🛵 Sal cuando estés listo";
+  document.getElementById("statusText").textContent = `Tu chofer ya llegó ${serviceType === "taxi" ? "🚕" : "🛵"} Sal cuando estés listo`;
   updateRouteLine();
 }
 
 function onTripStarted() {
   currentRideStatus = "en_curso";
-  document.getElementById("statusText").textContent = "En camino a tu destino 🛵";
+  document.getElementById("statusText").textContent = `En camino a tu destino ${serviceType === "taxi" ? "🚕" : "🛵"}`;
   updateRouteLine();
 }
 
@@ -579,7 +579,7 @@ function onDriverLost() {
 function onDriverLocation({ lat, lng }) {
   driverPos = { lat, lng };
   if (!driverMarker) {
-    driverMarker = L.marker([lat, lng], { icon: motoIcon() }).addTo(statusMap);
+    driverMarker = L.marker([lat, lng], { icon: serviceType === "taxi" ? taxiIcon() : motoIcon() }).addTo(statusMap);
   } else {
     driverMarker.setLatLng([lat, lng]);
   }

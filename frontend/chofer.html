@@ -214,6 +214,19 @@ function motoIcon() {
   });
 }
 
+function taxiIcon() {
+  return L.divIcon({
+    className: "",
+    html: `<div style="background:#14161c;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,.4);border:2px solid #f6a623;font-size:17px;">🚕</div>`,
+    iconSize: [32, 32],
+    iconAnchor: [16, 16],
+  });
+}
+
+function vehicleIcon(vehicleType) {
+  return vehicleType === "taxi" ? taxiIcon() : motoIcon();
+}
+
 function haversine(lat1, lng1, lat2, lng2) {
   const R = 6371;
   const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -290,7 +303,7 @@ function startApp() {
 }
 
 async function loadOtherDrivers() {
-  const res = await fetch(API + "/api/drivers/available");
+  const res = await fetch(API + `/api/drivers/available?type=${driver.vehicle_type}`);
   if (!res.ok) return;
   const drivers = (await res.json()).filter((d) => d.id !== driver.id);
   const seen = new Set();
@@ -300,7 +313,7 @@ async function loadOtherDrivers() {
     if (otherDriverMarkers.has(d.id)) {
       otherDriverMarkers.get(d.id).setLatLng(pos);
     } else {
-      otherDriverMarkers.set(d.id, L.marker(pos, { icon: motoIcon() }).addTo(map).bindPopup(d.name));
+      otherDriverMarkers.set(d.id, L.marker(pos, { icon: vehicleIcon(driver.vehicle_type) }).addTo(map).bindPopup(d.name));
     }
   }
   for (const [id, marker] of otherDriverMarkers) {
@@ -367,7 +380,7 @@ function watchLocation() {
     (pos) => {
       myPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
       if (!myMarker) {
-        myMarker = L.marker([myPos.lat, myPos.lng], { title: "Tú", icon: motoIcon() }).addTo(map);
+        myMarker = L.marker([myPos.lat, myPos.lng], { title: "Tú", icon: vehicleIcon(driver.vehicle_type) }).addTo(map);
         if (didFitOtherDrivers && otherDriverMarkers.size > 0) {
           const points = [...otherDriverMarkers.values()].map((m) => m.getLatLng());
           points.push(L.latLng(myPos.lat, myPos.lng));
