@@ -24,8 +24,11 @@
   #driverCard .name { font-size: 16px; font-weight: 700; }
   #driverCard .meta { color: var(--text-dim); font-size: 13.5px; margin-top: 2px; }
   #driverCard .meta a { color: var(--text-dim); }
-  .driverPhoto { width: 50px; height: 50px; border-radius: 50%; object-fit: cover; flex-shrink: 0; border: 2px solid var(--accent); }
+  .driverPhoto { width: 50px; height: 50px; border-radius: 50%; object-fit: cover; flex-shrink: 0; border: 2px solid var(--accent); cursor: pointer; }
   .driverPhotoFallback { display: flex; align-items: center; justify-content: center; font-size: 24px; background: var(--bg-card); }
+  #photoLightbox { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.85); z-index: 2000; align-items: center; justify-content: center; padding: 24px; }
+  #photoLightbox.show { display: flex; }
+  #photoLightbox img { max-width: 90vw; max-height: 80vh; border-radius: var(--radius-lg); border: 3px solid var(--accent); }
   #errorScreen { display: none; flex: 1; align-items: center; justify-content: center; flex-direction: column; gap: 10px; padding: 24px; text-align: center; }
   .credit { padding: 8px; background: var(--bg-panel); }
 </style>
@@ -50,7 +53,19 @@
 
 <div class="credit">⚡ Tecnología de <strong>Lealtad Digital</strong></div>
 
+<div id="photoLightbox" onclick="closePhotoLightbox()">
+  <img id="photoLightboxImg" src="" />
+</div>
+
 <script>
+function openPhotoLightbox(src) {
+  document.getElementById("photoLightboxImg").src = src;
+  document.getElementById("photoLightbox").classList.add("show");
+}
+function closePhotoLightbox() {
+  document.getElementById("photoLightbox").classList.remove("show");
+}
+
 const rideId = new URLSearchParams(location.search).get("id");
 let map, driverMarker, driverPos = null;
 let routeLine = null, routeRefreshInterval = null;
@@ -165,7 +180,7 @@ function renderDriverCard(driver) {
   card.style.display = "block";
   card.innerHTML = `
     <div class="driverInfo">
-      ${driver.photo ? `<img class="driverPhoto" src="${driver.photo}" />` : `<div class="driverPhoto driverPhotoFallback">${serviceType === "taxi" ? "🚕" : "🛵"}</div>`}
+      ${driver.photo ? `<img class="driverPhoto" src="${driver.photo}" onclick="openPhotoLightbox('${driver.photo}')" />` : `<div class="driverPhoto driverPhotoFallback">${serviceType === "taxi" ? "🚕" : "🛵"}</div>`}
       <div>
         <div class="name">${driver.name}</div>
         <div class="meta">${driver.vehicle || (serviceType === "taxi" ? "Taxi" : "Mototaxi")}</div>
