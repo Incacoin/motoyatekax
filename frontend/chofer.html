@@ -394,6 +394,7 @@ function watchLocation() {
       if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ type: "location", lat: myPos.lat, lng: myPos.lng }));
       }
+      syncPendingMarkers();
       renderRideList();
     },
     (err) => console.warn("geo error", err),
@@ -415,6 +416,7 @@ function toggleAvailable() {
     requestWakeLock();
   } else {
     pendingRides = {};
+    syncPendingMarkers();
     releaseWakeLock();
     renderRideList();
   }
@@ -472,6 +474,7 @@ function playNotificationSound() {
 const PENDING_RIDE_COLORS = ["#9b59b6", "#2ecc71", "#e84393", "#1abc9c", "#e67e22", "#c0392b"];
 let pendingColorCounter = 0;
 const pendingRideColors = {};
+const MAX_VISIBLE_PENDING_RIDES = 5;
 
 function colorForPendingRide(id) {
   if (!(id in pendingRideColors)) {
@@ -481,15 +484,42 @@ function colorForPendingRide(id) {
   return pendingRideColors[id];
 }
 
+function distanceToPendingRide(ride) {
+  return myPos ? haversine(myPos.lat, myPos.lng, ride.pickup_lat, ride.pickup_lng) : Infinity;
+}
+
+function sortedPendingRides() {
+  return Object.values(pendingRides).sort((a, b) => distanceToPendingRide(a) - distanceToPendingRide(b));
+}
+
+// Solo se pintan pines de las N solicitudes más cercanas: con muchas simultáneas
+// (hospital/universidad en hora pico) el mapa se vuelve ilegible si se muestran todas.
+function syncPendingMarkers() {
+  const visibleIds = new Set(sortedPendingRides().slice(0, MAX_VISIBLE_PENDING_RIDES).map((r) => r.id));
+
+  for (const id of Object.keys(pendingMarkers)) {
+    if (!visibleIds.has(Number(id))) {
+      pendingMarkers[id].forEach((m) => map.removeLayer(m));
+      delete pendingMarkers[id];
+    }
+  }
+
+  for (const id of visibleIds) {
+    if (pendingMarkers[id]) continue;
+    const ride = pendingRides[id];
+    const color = colorForPendingRide(ride.id);
+    const markers = [L.marker([ride.pickup_lat, ride.pickup_lng], { icon: numberedIcon(1, color) }).addTo(map).bindPopup(ride.rider_name)];
+    if (ride.dest_lat) {
+      markers.push(L.marker([ride.dest_lat, ride.dest_lng], { icon: numberedIcon(2, color) }).addTo(map).bindPopup(ride.rider_name));
+    }
+    pendingMarkers[ride.id] = markers;
+  }
+}
+
 function addPendingRide(ride) {
   playNotificationSound();
   pendingRides[ride.id] = ride;
-  const color = colorForPendingRide(ride.id);
-  const markers = [L.marker([ride.pickup_lat, ride.pickup_lng], { icon: numberedIcon(1, color) }).addTo(map).bindPopup(ride.rider_name)];
-  if (ride.dest_lat) {
-    markers.push(L.marker([ride.dest_lat, ride.dest_lng], { icon: numberedIcon(2, color) }).addTo(map).bindPopup(ride.rider_name));
-  }
-  pendingMarkers[ride.id] = markers;
+  syncPendingMarkers();
   renderRideList();
 }
 
@@ -500,6 +530,7 @@ function removePendingRide(id) {
     pendingMarkers[id].forEach((m) => map.removeLayer(m));
     delete pendingMarkers[id];
   }
+  syncPendingMarkers();
   renderRideList();
 }
 
@@ -557,8 +588,9 @@ function renderRideList() {
     return;
   }
 
-  const rides = Object.values(pendingRides);
-  const shape = rides.length === 0 ? "empty:" + available : "pending:" + rides.map((r) => r.id).sort().join(",");
+  const allPending = sortedPendingRides();
+  const rides = allPending.slice(0, MAX_VISIBLE_PENDING_RIDES);
+  const shape = rides.length === 0 ? "empty:" + available : "pending:" + rides.map((r) => r.id).join(",") + ":" + allPending.length;
   if (shape === renderedShape) { updateDistances(); return; }
   renderedShape = shape;
 
@@ -566,7 +598,7 @@ function renderRideList() {
     el.innerHTML = `<div class="empty">${available ? "Esperando solicitudes..." : "Actívate como disponible para recibir viajes"}</div>`;
     return;
   }
-  el.innerHTML = rides.map((r) => {
+  const cards = rides.map((r) => {
     const dist = myPos ? haversine(myPos.lat, myPos.lng, r.pickup_lat, r.pickup_lng).toFixed(1) : "?";
     const color = colorForPendingRide(r.id);
     return `
@@ -579,6 +611,11 @@ function renderRideList() {
         <button class="btn" onclick="acceptRide(${r.id})">Aceptar</button>
       </div>`;
   }).join("");
+  const moreCount = allPending.length - rides.length;
+  const moreHint = moreCount > 0
+    ? `<div class="empty" style="padding:8px 0;">+${moreCount} solicitud${moreCount === 1 ? "" : "es"} más lejos</div>`
+    : "";
+  el.innerHTML = cards + moreHint;
 }
 
 function updateDistances() {
