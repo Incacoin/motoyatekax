@@ -45,6 +45,7 @@ router.post("/rides", (req, res) => {
     .get(result.lastInsertRowid);
 
   realtime.broadcastNewRide(ride);
+  realtime.startNoDriverTimer(ride.id);
   res.status(201).json(ride);
 });
 
@@ -82,6 +83,7 @@ router.post("/rides/:id/accept", (req, res) => {
   db.prepare("UPDATE drivers SET status = 'en_viaje' WHERE id = ?").run(
     driverId
   );
+  realtime.clearNoDriverTimer(rideId);
 
   const ride = db.prepare("SELECT * FROM rides WHERE id = ?").get(rideId);
   const driver = db
@@ -168,6 +170,7 @@ router.post("/rides/:id/cancel", (req, res) => {
     "UPDATE rides SET status = 'cancelado', updated_at = datetime('now'), driver_disconnected_at = NULL WHERE id = ?"
   ).run(rideId);
   realtime.clearDisconnectTimer(rideId);
+  realtime.clearNoDriverTimer(rideId);
 
   if (ride.driver_id) {
     db.prepare("UPDATE drivers SET status = 'disponible' WHERE id = ?").run(
