@@ -475,6 +475,7 @@ async function requestRide() {
     }),
   });
   ride = await res.json();
+  localStorage.setItem("motoya_active_ride", String(ride.id));
 
   stopAvailableDriversPolling();
   document.getElementById("mapScreen").classList.remove("active");
@@ -628,6 +629,7 @@ function onDriverLocation({ lat, lng }) {
 
 function onCompleted() {
   currentRideStatus = "completado";
+  localStorage.removeItem("motoya_active_ride");
   document.getElementById("statusText").textContent = "¡Buen viaje! Gracias por usar MotoYaTekax 🛵";
   document.getElementById("connWarning").style.display = "none";
   document.getElementById("driverCard").style.display = "none";
@@ -672,6 +674,7 @@ async function rateRide(rating) {
 
 function onNoDriversAvailable() {
   currentRideStatus = "cancelado";
+  localStorage.removeItem("motoya_active_ride");
   document.getElementById("statusText").textContent = "😕 No hay choferes disponibles ahorita. Intenta de nuevo en unos minutos.";
   document.getElementById("connWarning").style.display = "none";
   document.getElementById("chatBox").style.display = "none";
@@ -684,6 +687,7 @@ function onNoDriversAvailable() {
 
 function onCancelledByDriver() {
   currentRideStatus = "cancelado";
+  localStorage.removeItem("motoya_active_ride");
   document.getElementById("statusText").textContent = "El viaje fue cancelado.";
   document.getElementById("connWarning").style.display = "none";
   document.getElementById("chatBox").style.display = "none";
@@ -697,6 +701,7 @@ function onCancelledByDriver() {
 async function cancelRide() {
   if (!ride) return;
   currentRideStatus = "cancelado";
+  localStorage.removeItem("motoya_active_ride");
   stopRouteTracking();
   releaseWakeLock();
   await fetch(API + `/api/rides/${ride.id}/cancel`, { method: "POST" });
@@ -707,6 +712,51 @@ async function cancelRide() {
   document.getElementById("cancelBtn").style.display = "none";
   document.getElementById("newRideBtn").style.display = "inline-block";
 }
+
+async function restoreActiveRide() {
+  const savedId = localStorage.getItem("motoya_active_ride");
+  if (!savedId) return;
+
+  let fetched;
+  try {
+    const res = await fetch(API + `/api/rides/${savedId}`);
+    if (!res.ok) { localStorage.removeItem("motoya_active_ride"); return; }
+    fetched = await res.json();
+  } catch {
+    return; // sin conexión ahorita; se reintenta la próxima vez que abra la app
+  }
+
+  if (["completado", "cancelado"].includes(fetched.status)) {
+    localStorage.removeItem("motoya_active_ride");
+    return;
+  }
+
+  ride = fetched;
+  pickup = { lat: fetched.pickup_lat, lng: fetched.pickup_lng };
+  dest = fetched.dest_lat != null ? { lat: fetched.dest_lat, lng: fetched.dest_lng } : null;
+  passengers = fetched.passengers || 1;
+  serviceType = fetched.ride_type === "taxi" ? "taxi" : "moto";
+  currentRideStatus = fetched.status;
+
+  document.getElementById("form").classList.remove("active");
+  document.getElementById("status").classList.add("active");
+
+  statusMap = L.map("statusMap").setView([pickup.lat, pickup.lng], 15);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "&copy; OpenStreetMap" }).addTo(statusMap);
+  L.marker([pickup.lat, pickup.lng], { icon: numberedIcon(1, "#f6a623") }).addTo(statusMap);
+  if (dest) L.marker([dest.lat, dest.lng], { icon: numberedIcon(2, "#3498db") }).addTo(statusMap);
+
+  if (fetched.driver) {
+    onDriverAssigned(fetched.driver);
+    if (fetched.status === "llegue") onDriverArrived();
+    if (fetched.status === "en_curso") onTripStarted();
+  }
+
+  connectWs();
+  requestWakeLock();
+}
+
+restoreActiveRide();
 </script>
 </body>
 </html>
