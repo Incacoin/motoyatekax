@@ -44,8 +44,11 @@
   #driverCard .name { font-size: 18px; font-weight: 700; }
   #driverCard .meta { color: var(--text-dim); margin-top: 4px; font-size: 14px; }
   .driverInfo { display: flex; align-items: center; gap: 14px; }
-  .driverPhoto { width: 56px; height: 56px; border-radius: 50%; object-fit: cover; flex-shrink: 0; border: 2px solid var(--accent); }
+  .driverPhoto { width: 56px; height: 56px; border-radius: 50%; object-fit: cover; flex-shrink: 0; border: 2px solid var(--accent); cursor: pointer; }
   .driverPhotoFallback { display: flex; align-items: center; justify-content: center; font-size: 26px; background: var(--bg-card); }
+  #photoLightbox { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.85); z-index: 2000; align-items: center; justify-content: center; padding: 24px; }
+  #photoLightbox.show { display: flex; }
+  #photoLightbox img { max-width: 90vw; max-height: 80vh; border-radius: var(--radius-lg); border: 3px solid var(--accent); }
   #ratingBox { padding: 18px; text-align: center; }
   .ratingQuestion { margin: 0 0 12px; font-size: 15px; }
   .ratingButtons { display: flex; gap: 10px; justify-content: center; }
@@ -131,7 +134,19 @@
   <div class="credit">⚡ Tecnología de <strong>Lealtad Digital</strong> · <a href="aviso-legal.html" target="_blank" rel="noopener">Aviso legal</a></div>
 </div>
 
+<div id="photoLightbox" onclick="closePhotoLightbox()">
+  <img id="photoLightboxImg" src="" />
+</div>
+
 <script>
+function openPhotoLightbox(src) {
+  document.getElementById("photoLightboxImg").src = src;
+  document.getElementById("photoLightbox").classList.add("show");
+}
+function closePhotoLightbox() {
+  document.getElementById("photoLightbox").classList.remove("show");
+}
+
 const API = "";
 let deferredInstallPrompt = null;
 
@@ -534,7 +549,7 @@ function onDriverAssigned(driver) {
   card.style.display = "block";
   card.innerHTML = `
     <div class="driverInfo">
-      ${driver.photo ? `<img class="driverPhoto" src="${driver.photo}" />` : `<div class="driverPhoto driverPhotoFallback">${serviceType === "taxi" ? "🚕" : "🛵"}</div>`}
+      ${driver.photo ? `<img class="driverPhoto" src="${driver.photo}" onclick="openPhotoLightbox('${driver.photo}')" />` : `<div class="driverPhoto driverPhotoFallback">${serviceType === "taxi" ? "🚕" : "🛵"}</div>`}
       <div>
         <div class="name">${driver.name}</div>
         <div class="meta">${driver.vehicle || (serviceType === "taxi" ? "Taxi" : "Mototaxi")}</div>
