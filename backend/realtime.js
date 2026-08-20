@@ -8,11 +8,18 @@ const driverSockets = new Map();
 const rideSubscribers = new Map();
 // rideId -> Timeout (cuenta regresiva de "chofer desconectado" -> "chofer perdido")
 const disconnectTimers = new Map();
+// rideId -> Timeout (cuenta regresiva de "nadie ha aceptado el viaje")
+const noDriverTimers = new Map();
 
 // Ventana de gracia antes de avisarle al pasajero que el chofer no vuelve.
 // Cubre un parpadeo normal de señal (el chofer reconecta solo, en ~2s) sin
 // alarmar al pasajero de más; si pasa esto, algo de verdad se cayó.
 const DISCONNECT_GRACE_MS = 20000;
+
+// Cuánto esperar después de crear un viaje antes de avisarle al pasajero que
+// no hay choferes disponibles. Si se queda "buscando" más de esto sin que
+// nadie lo acepte, probablemente no hay oferta suficiente en ese momento.
+const NO_DRIVER_GRACE_MS = 60000;
 
 // Un chofer normalmente solo tiene un viaje activo a la vez, pero si su app se
 // recargó a medio viaje (pantalla apagada, refresh) el viaje viejo se queda
@@ -60,6 +67,29 @@ function handleDriverReconnected(driverId) {
     disconnectTimers.delete(ride.id);
   }
   notifyRide(ride.id, "driver_reconnected", {});
+}
+
+function startNoDriverTimer(rideId) {
+  const timer = setTimeout(() => {
+    noDriverTimers.delete(rideId);
+    const ride = db.prepare("SELECT status FROM rides WHERE id = ?").get(rideId);
+    if (!ride || ride.status !== "buscando") return;
+
+    db.prepare(
+      "UPDATE rides SET status = 'cancelado', updated_at = datetime('now') WHERE id = ?"
+    ).run(rideId);
+    notifyRide(rideId, "no_drivers_available", {});
+    broadcastRideRemoved(rideId);
+  }, NO_DRIVER_GRACE_MS);
+  noDriverTimers.set(rideId, timer);
+}
+
+function clearNoDriverTimer(rideId) {
+  const timer = noDriverTimers.get(rideId);
+  if (timer) {
+    clearTimeout(timer);
+    noDriverTimers.delete(rideId);
+  }
 }
 
 function attach(httpServer) {
@@ -223,4 +253,6 @@ module.exports = {
   broadcastRideRemoved,
   notifyDriver,
   clearDisconnectTimer,
+  startNoDriverTimer,
+  clearNoDriverTimer,
 };
