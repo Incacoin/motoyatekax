@@ -531,6 +531,7 @@ function connectWs() {
     if (type === "driver_disconnected") onDriverDisconnected();
     if (type === "driver_reconnected") onDriverReconnected();
     if (type === "driver_lost") onDriverLost();
+    if (type === "no_drivers_available") onNoDriversAvailable();
     if (type === "chat") appendChatMessage(payload.text, "them");
   };
   ws.onclose = () => {
@@ -667,6 +668,18 @@ async function rateRide(rating) {
     return;
   }
   box.innerHTML = '<p class="ratingQuestion">¡Gracias por tu opinión! 🙏</p>';
+}
+
+function onNoDriversAvailable() {
+  currentRideStatus = "cancelado";
+  document.getElementById("statusText").textContent = "😕 No hay choferes disponibles ahorita. Intenta de nuevo en unos minutos.";
+  document.getElementById("connWarning").style.display = "none";
+  document.getElementById("chatBox").style.display = "none";
+  document.getElementById("shareBtn").style.display = "none";
+  document.getElementById("cancelBtn").style.display = "none";
+  document.getElementById("newRideBtn").style.display = "inline-block";
+  stopRouteTracking();
+  releaseWakeLock();
 }
 
 function onCancelledByDriver() {
