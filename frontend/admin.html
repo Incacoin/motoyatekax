@@ -153,6 +153,10 @@
       <option value="taxi">🚕 Taxi (viajes largos)</option>
     </select>
   </div>
+  <div class="field">
+    <label>Foto (opcional)</label>
+    <input type="file" id="driverPhotoInput" accept="image/*" capture="environment" onchange="handleDriverPhoto(event)" />
+  </div>
   <div id="pendingPhotoPreview" class="pendingPhotoPreview"></div>
   <div class="field legalField">
     <label class="legalCheck">
@@ -326,8 +330,34 @@ function useApplication(id) {
 function renderPendingPhotoPreview() {
   const el = document.getElementById("pendingPhotoPreview");
   el.innerHTML = pendingDriverPhoto
-    ? `<img class="thumb" src="${pendingDriverPhoto}" /> <span class="ago">Foto de su solicitud — se guardará con este chofer</span>`
+    ? `<img class="thumb" src="${pendingDriverPhoto}" /> <span class="ago">Se guardará con este chofer</span>`
     : "";
+}
+
+function handleDriverPhoto(event) {
+  const file = event.target.files[0];
+  const err = document.getElementById("err2");
+  err.textContent = "";
+  if (!file) return;
+
+  const img = new Image();
+  const reader = new FileReader();
+  reader.onload = (e) => { img.src = e.target.result; };
+  reader.onerror = () => { err.textContent = "No se pudo leer la foto, intenta de nuevo"; };
+  img.onload = () => {
+    let { width, height } = img;
+    const maxDim = 900;
+    if (width > height && width > maxDim) { height = Math.round(height * (maxDim / width)); width = maxDim; }
+    else if (height > maxDim) { width = Math.round(width * (maxDim / height)); height = maxDim; }
+
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+    pendingDriverPhoto = canvas.toDataURL("image/jpeg", 0.72);
+    renderPendingPhotoPreview();
+  };
+  reader.readAsDataURL(file);
 }
 
 async function dismissApplication(id, silent) {
@@ -394,8 +424,6 @@ async function registerDriver() {
   }
   const driver = await res.json();
   lastRegistered = driver;
-  pendingDriverPhoto = null;
-  renderPendingPhotoPreview();
 
   document.getElementById("newDriverName").textContent = driver.name;
   document.getElementById("newPin").textContent = driver.pin;
@@ -407,6 +435,9 @@ async function registerDriver() {
   document.getElementById("driverTipo").value = "informal";
   document.getElementById("driverVehicleType").value = "moto";
   document.getElementById("driverAcceptedLegal").checked = false;
+  document.getElementById("driverPhotoInput").value = "";
+  pendingDriverPhoto = null;
+  renderPendingPhotoPreview();
 
   loadDrivers();
 }
