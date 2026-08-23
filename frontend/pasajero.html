@@ -570,7 +570,8 @@ async function onDriverAssigned(driver) {
       <div>
         <div class="name">${driver.name}</div>
         ${badgeHtml}
-        <div class="meta">${driver.vehicle || (serviceType === "taxi" ? "Taxi" : "Mototaxi")}</div>
+        ${driver.grupo ? `<div class="meta">Agrupación: ${driver.grupo}</div>` : ""}
+        <div class="meta">${driver.vehicle ? `Placa: ${driver.vehicle}` : (serviceType === "taxi" ? "Taxi" : "Mototaxi")}</div>
         <div class="meta">Tel: ${driver.phone}</div>
       </div>
     </div>`;
