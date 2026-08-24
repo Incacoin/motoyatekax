@@ -1,24 +1,33 @@
 const express = require("express");
 const db = require("../db");
-const { AVISO_LEGAL_VERSION } = require("../constants");
+const { AVISO_LEGAL_VERSION, MAX_MATCH_DISTANCE_KM, SERVICE_CENTER, DRIVER_STALE_SECONDS } = require("../constants");
+const { haversineKm } = require("../geo");
 
 const router = express.Router();
 
+// Choferes "disponibles" de verdad: con GPS reciente (no fantasmas de una
+// sesión que se quedó abierta) y cerca de quien está mirando el mapa.
 router.get("/drivers/available", (req, res) => {
-  const type = req.query.type === "taxi" ? "taxi" : null;
-  const cooldownClause = "AND (cooldown_until IS NULL OR cooldown_until <= datetime('now'))";
-  const drivers = type
-    ? db
-        .prepare(
-          `SELECT id, name, lat, lng, vehicle_type FROM drivers WHERE status = 'disponible' AND lat IS NOT NULL AND lng IS NOT NULL AND deleted_at IS NULL AND vehicle_type = ? ${cooldownClause}`
-        )
-        .all(type)
-    : db
-        .prepare(
-          `SELECT id, name, lat, lng, vehicle_type FROM drivers WHERE status = 'disponible' AND lat IS NOT NULL AND lng IS NOT NULL AND deleted_at IS NULL AND vehicle_type = 'moto' ${cooldownClause}`
-        )
-        .all();
-  res.json(drivers);
+  const type = req.query.type === "taxi" ? "taxi" : "moto";
+  const refLat = Number(req.query.lat);
+  const refLng = Number(req.query.lng);
+  const hasRef = Number.isFinite(refLat) && Number.isFinite(refLng);
+  const ref = hasRef ? { lat: refLat, lng: refLng } : SERVICE_CENTER;
+
+  const drivers = db
+    .prepare(
+      `SELECT id, name, lat, lng, vehicle_type FROM drivers
+       WHERE status = 'disponible' AND lat IS NOT NULL AND lng IS NOT NULL AND deleted_at IS NULL
+         AND vehicle_type = ?
+         AND (cooldown_until IS NULL OR cooldown_until <= datetime('now'))
+         AND last_seen >= datetime('now', '-${DRIVER_STALE_SECONDS} seconds')`
+    )
+    .all(type);
+
+  const nearby = drivers.filter(
+    (d) => haversineKm(ref.lat, ref.lng, d.lat, d.lng) <= MAX_MATCH_DISTANCE_KM
+  );
+  res.json(nearby);
 });
 
 // Insignia de "top chofer": los 3 con más viajes en los últimos 30 días,
