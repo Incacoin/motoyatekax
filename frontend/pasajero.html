@@ -348,9 +348,12 @@ function taxiIcon() {
 let availableDriverMarkers = new Map();
 let availableDriversPollTimer = null;
 let didFitAvailableDrivers = false;
+let geoPos = null;
 
 async function loadAvailableDrivers() {
-  const res = await fetch(API + `/api/drivers/available?type=${serviceType}`);
+  const ref = pickup || geoPos;
+  const refQuery = ref ? `&lat=${ref.lat}&lng=${ref.lng}` : "";
+  const res = await fetch(API + `/api/drivers/available?type=${serviceType}${refQuery}`);
   if (!res.ok) return;
   const drivers = await res.json();
   const seen = new Set();
@@ -416,6 +419,8 @@ function goToMap() {
   if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition((pos) => {
       const me = L.latLng(pos.coords.latitude, pos.coords.longitude);
+      geoPos = me;
+      loadAvailableDrivers(); // ya sabemos dónde estás, refresca con el radio correcto
       if (didFitAvailableDrivers && availableDriverMarkers.size > 0) {
         const points = [...availableDriverMarkers.values()].map((m) => m.getLatLng());
         points.push(me);
