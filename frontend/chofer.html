@@ -344,7 +344,8 @@ function startApp() {
 }
 
 async function loadOtherDrivers() {
-  const res = await fetch(API + `/api/drivers/available?type=${driver.vehicle_type}`);
+  const refQuery = myPos ? `&lat=${myPos.lat}&lng=${myPos.lng}` : "";
+  const res = await fetch(API + `/api/drivers/available?type=${driver.vehicle_type}${refQuery}`);
   if (!res.ok) return;
   const drivers = (await res.json()).filter((d) => d.id !== driver.id);
   const seen = new Set();
