@@ -158,6 +158,7 @@ function closePhotoLightbox() {
 
 const API = "";
 let deferredInstallPrompt = null;
+fetch(API + "/api/config").then((r) => r.json()).then((cfg) => { SERVICE_FEE = cfg.serviceFee; }).catch(() => {});
 
 function isStandalone() {
   return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
@@ -272,9 +273,13 @@ function stopRouteTracking() {
   updateEtaDisplay(null);
 }
 
+// Tarifas del gremio de Tekax (distintas a las de Ticul, negociadas aparte).
 const FARE_THRESHOLD_KM = 3;
 const FARE_NORMAL = 15;
 const FARE_FAR = 20;
+// Cuota de la app, igual en todos los pueblos. La paga el pasajero, no sale
+// de lo que gana el chofer.
+let SERVICE_FEE = 2; // valor de respaldo hasta que cargue /api/config
 
 function haversine(lat1, lng1, lat2, lng2) {
   const R = 6371;
@@ -294,7 +299,7 @@ function updateFareEstimate() {
   const el = document.getElementById("fareEstimate");
   if (!pickup) { el.textContent = ""; return; }
   if (serviceType === "taxi") {
-    el.textContent = "Viaje foráneo: acuerda el precio directo con el chofer";
+    el.textContent = `Viaje foráneo: acuerda el precio directo con el chofer + $${SERVICE_FEE} de servicio de la app`;
     return;
   }
   let pricePerPerson = FARE_NORMAL;
@@ -304,8 +309,8 @@ function updateFareEstimate() {
     pricePerPerson = tripKm > FARE_THRESHOLD_KM ? FARE_FAR : FARE_NORMAL;
     approx = false;
   }
-  const total = pricePerPerson * passengers;
-  el.textContent = `Tarifa estimada: $${total} MXN (${passengers} pasajero${passengers > 1 ? "s" : ""})${approx ? " · aprox., marca destino para afinar" : ""}`;
+  const total = pricePerPerson * passengers + SERVICE_FEE;
+  el.textContent = `Tarifa estimada: $${total} MXN (${passengers} pasajero${passengers > 1 ? "s" : ""}, incluye $${SERVICE_FEE} de servicio)${approx ? " · aprox., marca destino para afinar" : ""}`;
 }
 
 function setServiceType(type) {

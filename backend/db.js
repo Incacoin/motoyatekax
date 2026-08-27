@@ -1,5 +1,6 @@
 const path = require("node:path");
 const { DatabaseSync } = require("node:sqlite");
+const { SERVICE_FEE_START_DATE } = require("./constants");
 
 const dbPath = path.join(__dirname, "data", "motoya.db");
 const db = new DatabaseSync(dbPath);
@@ -216,5 +217,31 @@ db.exec(`
   SET rider_id = (SELECT id FROM riders WHERE riders.phone = rides.rider_phone)
   WHERE rider_id IS NULL;
 `);
+
+try {
+  db.exec("ALTER TABLE rides ADD COLUMN fee_settled_at TEXT");
+} catch {
+  // la columna ya existe
+}
+
+try {
+  db.exec("ALTER TABLE driver_payments ADD COLUMN concept TEXT NOT NULL DEFAULT 'mensual'");
+} catch {
+  // la columna ya existe
+}
+
+try {
+  db.exec("ALTER TABLE driver_payments ADD COLUMN ride_count INTEGER");
+} catch {
+  // la columna ya existe
+}
+
+// Los viajes completados antes de que la cuota por viaje existiera en Tekax
+// se marcan como ya liquidados: no se le cobra a nadie de forma retroactiva.
+// El filtro por fecha lo hace idempotente — al reiniciar el servidor no
+// borra las cuotas realmente pendientes de viajes nuevos.
+db.prepare(
+  "UPDATE rides SET fee_settled_at = updated_at WHERE status = 'completado' AND fee_settled_at IS NULL AND date(updated_at) < date(?)"
+).run(SERVICE_FEE_START_DATE);
 
 module.exports = db;
