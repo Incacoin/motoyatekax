@@ -256,7 +256,7 @@ fetch(API + "/api/config").then((r) => r.json()).then((cfg) => {
   SERVICE_FEE = cfg.serviceFee;
   MONTHLY_FEE = cfg.monthlyFee;
 }).catch(() => {});
-// Tekax no tiene ventana de prueba con fecha (Ticul sí) — se queda en null.
+// null = prueba gratis indefinida, sin fecha de corte automática.
 let trialEndDateCache = null;
 let adminPin = null;
 let launchRankingCache = [];
@@ -778,7 +778,7 @@ function monthsOverdue(d, today) {
 
 function paymentReminderMessage(d) {
   const today = new Date().toISOString().slice(0, 10);
-  const inTrial = trialEndDateCache && today < trialEndDateCache;
+  const inTrial = !d.paid_until && (!trialEndDateCache || today < trialEndDateCache);
   const pendingRides = d.pending_rides || 0;
   const feeAmount = pendingRides * SERVICE_FEE;
   const monthlyVencido = !inTrial && (!d.paid_until || d.paid_until < today);
@@ -787,7 +787,8 @@ function paymentReminderMessage(d) {
 
   const lines = [];
   if (inTrial && !d.paid_until) {
-    lines.push(`🎉 Sigues en tu mes de prueba gratis (hasta el ${trialEndDateCache}) — todavía no debes cuota mensual.`);
+    const hasta = trialEndDateCache ? `hasta el ${trialEndDateCache}` : "sin fecha límite por ahora";
+    lines.push(`🎉 Sigues en tu mes de prueba gratis (${hasta}) — todavía no debes cuota mensual.`);
   } else {
     lines.push(
       monthlyVencido
