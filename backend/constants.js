@@ -10,7 +10,7 @@ module.exports = {
   // fecha se marcan como ya liquidados: no se le puede cobrar a un chofer
   // por viajes que hizo cuando la cuota todavía no existía aquí.
   SERVICE_FEE_START_DATE: "2026-08-27",
-  // Sin ventana de prueba definida en Tekax (Ticul sí tiene uno con fecha).
+  // null = prueba gratis indefinida, sin fecha de corte automática.
   TRIAL_END_DATE: null,
   // Un chofer "disponible" a más de esto de quien está mirando el mapa no es
   // realista que llegue por él, ya sea un pasajero viendo el mapa o un chofer
