@@ -236,6 +236,12 @@ try {
   // la columna ya existe
 }
 
+try {
+  db.exec("ALTER TABLE rides ADD COLUMN children INTEGER NOT NULL DEFAULT 0");
+} catch {
+  // la columna ya existe
+}
+
 // Los viajes completados antes de que la cuota por viaje existiera en Tekax
 // se marcan como ya liquidados: no se le cobra a nadie de forma retroactiva.
 // El filtro por fecha lo hace idempotente — al reiniciar el servidor no
