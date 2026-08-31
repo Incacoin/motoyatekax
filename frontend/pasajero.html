@@ -79,6 +79,7 @@
   </div>
   <div class="brand"><span class="brand-icon">🛵</span>MotoYaTekax</div>
   <div style="color:var(--text-dim);">Pide tu mototaxi</div>
+  <div style="color:var(--text-dim); font-size:13px; margin-top:-4px;">Pasajes, delivery y mandados</div>
   <input id="nameInput" placeholder="Tu nombre" oninput="this.value = this.value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s'-]/g, '')" />
   <input id="phoneInput" placeholder="Tu teléfono" inputmode="numeric" maxlength="10" oninput="this.value = this.value.replace(/\D/g, '')" />
   <button class="btn" onclick="goToMap()">Continuar</button>
@@ -111,6 +112,14 @@
         <button class="btn-sm" onclick="changePassengers(-1)">−</button>
         <span id="passengerCount">1</span>
         <button class="btn-sm" onclick="changePassengers(1)">+</button>
+      </div>
+    </div>
+    <div class="row">
+      <span style="color:var(--text-dim);font-size:14px;">Niños (3-9 años)</span>
+      <div class="stepper">
+        <button class="btn-sm" onclick="changeChildren(-1)">−</button>
+        <span id="childrenCount">0</span>
+        <button class="btn-sm" onclick="changeChildren(1)">+</button>
       </div>
     </div>
     <input id="referenceInput" placeholder="Referencia (ej. casa azul, portón negro)" />
@@ -238,6 +247,7 @@ let routeLine = null;
 let routeRefreshInterval = null;
 let currentRideStatus = "buscando";
 let passengers = 1;
+let children = 0;
 let serviceType = "moto";
 
 async function fetchRoute(from, to) {
@@ -307,6 +317,13 @@ const FARE_FAR = 20;
 // Cuota de la app, igual en todos los pueblos. La paga el pasajero, no sale
 // de lo que gana el chofer.
 let SERVICE_FEE = 2; // valor de respaldo hasta que cargue /api/config
+const CHILD_FARE_DAY = 5;
+const CHILD_FARE_NIGHT = 10;
+
+function isNightFare() {
+  const h = new Date().getHours();
+  return h >= 22 || h < 6;
+}
 
 function haversine(lat1, lng1, lat2, lng2) {
   const R = 6371;
@@ -319,6 +336,16 @@ function haversine(lat1, lng1, lat2, lng2) {
 function changePassengers(delta) {
   passengers = Math.min(4, Math.max(1, passengers + delta));
   document.getElementById("passengerCount").textContent = passengers;
+  if (children > passengers) {
+    children = passengers;
+    document.getElementById("childrenCount").textContent = children;
+  }
+  updateFareEstimate();
+}
+
+function changeChildren(delta) {
+  children = Math.min(passengers, Math.max(0, children + delta));
+  document.getElementById("childrenCount").textContent = children;
   updateFareEstimate();
 }
 
@@ -336,8 +363,13 @@ function updateFareEstimate() {
     pricePerPerson = tripKm > FARE_THRESHOLD_KM ? FARE_FAR : FARE_NORMAL;
     approx = false;
   }
-  const total = pricePerPerson * passengers + SERVICE_FEE;
-  el.textContent = `Tarifa estimada: $${total} MXN (${passengers} pasajero${passengers > 1 ? "s" : ""}, incluye $${SERVICE_FEE} de servicio)${approx ? " · aprox., marca destino para afinar" : ""}`;
+  const adults = passengers - children;
+  const night = isNightFare();
+  const childRate = night ? CHILD_FARE_NIGHT : CHILD_FARE_DAY;
+  const total = pricePerPerson * adults + childRate * children + SERVICE_FEE;
+  const nightNote = night && children > 0 ? " · tarifa nocturna de niños" : "";
+  const childrenNote = children > 0 ? ` (${adults} adulto${adults === 1 ? "" : "s"} + ${children} niño${children === 1 ? "" : "s"})` : "";
+  el.textContent = `Tarifa estimada: $${total} MXN (${passengers} pasajero${passengers > 1 ? "s" : ""}${childrenNote}, incluye $${SERVICE_FEE} de servicio)${nightNote}${approx ? " · aprox., marca destino para afinar" : ""}`;
 }
 
 function setServiceType(type) {
@@ -517,6 +549,7 @@ async function requestRide() {
       dest_lat: dest ? dest.lat : null,
       dest_lng: dest ? dest.lng : null,
       passengers,
+      children,
       ride_type: serviceType,
     }),
   });
@@ -898,6 +931,7 @@ async function restoreActiveRide() {
   pickup = { lat: fetched.pickup_lat, lng: fetched.pickup_lng };
   dest = fetched.dest_lat != null ? { lat: fetched.dest_lat, lng: fetched.dest_lng } : null;
   passengers = fetched.passengers || 1;
+  children = fetched.children || 0;
   serviceType = fetched.ride_type === "taxi" ? "taxi" : "moto";
   currentRideStatus = fetched.status;
 
