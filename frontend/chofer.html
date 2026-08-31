@@ -359,11 +359,20 @@ const FARE_FAR = 20;
 // Cuota de la app, igual en todos los pueblos. La paga el pasajero, no sale
 // de lo que gana el chofer.
 let SERVICE_FEE = 2; // valor de respaldo hasta que cargue /api/config
+const CHILD_FARE_DAY = 5;
+const CHILD_FARE_NIGHT = 10;
+
+function isNightFare() {
+  const h = new Date().getHours();
+  return h >= 22 || h < 6;
+}
 
 function estimateFare(ride) {
   const passengers = ride.passengers || 1;
+  const children = ride.children || 0;
+  const childrenNote = children > 0 ? ` (${passengers - children} adulto${passengers - children === 1 ? "" : "s"} + ${children} niño${children === 1 ? "" : "s"})` : "";
   if (ride.ride_type === "taxi") {
-    return `Viaje foráneo · acuerda el precio con el pasajero + $${SERVICE_FEE} de servicio · ${passengers} pasajero${passengers > 1 ? "s" : ""}`;
+    return `Viaje foráneo · acuerda el precio con el pasajero + $${SERVICE_FEE} de servicio · ${passengers} pasajero${passengers > 1 ? "s" : ""}${childrenNote}`;
   }
   let pricePerPerson = FARE_NORMAL;
   let approx = true;
@@ -372,8 +381,11 @@ function estimateFare(ride) {
     pricePerPerson = tripKm > FARE_THRESHOLD_KM ? FARE_FAR : FARE_NORMAL;
     approx = false;
   }
-  const total = pricePerPerson * passengers + SERVICE_FEE;
-  return `$${total} MXN (incl. $${SERVICE_FEE} servicio) · ${passengers} pasajero${passengers > 1 ? "s" : ""}${approx ? " (aprox.)" : ""}`;
+  const night = isNightFare();
+  const childRate = night ? CHILD_FARE_NIGHT : CHILD_FARE_DAY;
+  const total = pricePerPerson * (passengers - children) + childRate * children + SERVICE_FEE;
+  const nightNote = night && children > 0 ? " · nocturna niños" : "";
+  return `$${total} MXN (incl. $${SERVICE_FEE} servicio)${nightNote} · ${passengers} pasajero${passengers > 1 ? "s" : ""}${childrenNote}${approx ? " (aprox.)" : ""}`;
 }
 
 async function login() {
