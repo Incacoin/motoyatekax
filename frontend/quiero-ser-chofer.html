@@ -18,7 +18,7 @@
   .phoneRow input { flex: 1; }
   .fieldHint { font-size: 12.5px; color: var(--text-dim); line-height: 1.45; margin: 0 0 8px; }
   .fieldHint a { color: var(--accent); }
-  #photoPreview { display: none; width: 100%; max-height: 220px; object-fit: cover; border-radius: var(--radius-sm); margin-top: 10px; border: 1px solid var(--border); }
+  #photoPreview, #photoPlacaPreview { display: none; width: 100%; max-height: 220px; object-fit: cover; border-radius: var(--radius-sm); margin-top: 10px; border: 1px solid var(--border); }
   #err { color: var(--danger); min-height: 18px; font-size: 13.5px; margin-top: 4px; }
   .legalCheck { display: flex; align-items: flex-start; gap: 8px; font-size: 12.5px; color: var(--text-dim); line-height: 1.5; cursor: pointer; }
   .legalCheck input { margin-top: 3px; flex-shrink: 0; }
@@ -33,6 +33,9 @@
   #okScreen p { color: var(--text-dim); font-size: 14px; line-height: 1.5; margin: 0; }
   .credit { margin-top: 22px; }
   button.btn { width: 100%; }
+  #grupoBanner, #formalGenericoBanner { display: none; background: rgba(46, 204, 113, 0.12); border: 1px solid rgba(46, 204, 113, 0.35); border-radius: var(--radius-sm); padding: 10px 12px; font-size: 13.5px; color: var(--text); margin-bottom: 18px; line-height: 1.5; }
+  #grupoBanner strong { color: var(--success); }
+  #grupoInputField { display: none; }
 </style>
 </head>
 <body>
@@ -41,6 +44,12 @@
   <div id="formScreen">
     <p class="brand"><span class="brand-icon">🛵</span>MotoYaTekax</p>
     <p class="lead">Regístrate como conductor y empieza a recibir viajes en Tekax. Déjanos tu nombre y teléfono — te contactamos por WhatsApp para completar tu alta y darte tu PIN.</p>
+    <div id="grupoBanner">🤝 Te registras con el aval de: <strong id="grupoNombre"></strong></div>
+    <div id="formalGenericoBanner">🤝 Registro para choferes de gremio formal. Tu líder deberá confirmarlo antes de darte de alta.</div>
+    <div class="field" id="grupoInputField">
+      <label>¿De qué gremio o agrupación eres?</label>
+      <input id="grupoInput" placeholder="Nombre del gremio" />
+    </div>
 
     <div class="field">
       <label>Nombre completo</label>
@@ -65,6 +74,12 @@
       <p class="fieldHint">Así verificamos que eres un chofer real y evitamos perfiles falsos.</p>
       <input type="file" id="photo" accept="image/*" capture="environment" onchange="handlePhoto(event)" />
       <img id="photoPreview" />
+    </div>
+    <div class="field" id="placaField">
+      <label id="placaLabel">Foto de tu moto y placa</label>
+      <p class="fieldHint" id="placaHint">Tómala de frente, con la placa bien visible y legible.</p>
+      <input type="file" id="photoPlaca" accept="image/*" capture="environment" onchange="handlePhotoPlaca(event)" />
+      <img id="photoPlacaPreview" />
     </div>
     <div class="field legalField">
       <label class="legalCheck">
@@ -96,20 +111,29 @@
 
 <script>
 let photoDataUrl = "";
+let photoPlacaDataUrl = "";
+const grupoParam = new URLSearchParams(location.search).get("grupo");
+const formalGenericoParam = new URLSearchParams(location.search).get("formal") === "1";
+const viaLiderLink = !!(grupoParam && grupoParam.trim());
+const esFormalGenerico = !viaLiderLink && formalGenericoParam;
 
-function handlePhoto(event) {
-  const file = event.target.files[0];
-  const err = document.getElementById("err");
-  err.textContent = "";
-  if (!file) {
-    photoDataUrl = "";
-    return;
-  }
+if (viaLiderLink) {
+  document.getElementById("grupoNombre").textContent = grupoParam.trim();
+  document.getElementById("grupoBanner").style.display = "block";
+  document.getElementById("placaField").style.display = "none";
+} else if (esFormalGenerico) {
+  document.getElementById("formalGenericoBanner").style.display = "block";
+  document.getElementById("grupoInputField").style.display = "flex";
+} else {
+  document.getElementById("placaLabel").textContent = "Foto de tu unidad con placa (si tiene)";
+  document.getElementById("placaHint").textContent = "Si tu unidad no tiene placa, no hay problema — puedes omitir este paso.";
+}
 
+function resizeToDataUrl(file, onDone, onError) {
   const img = new Image();
   const reader = new FileReader();
   reader.onload = (e) => { img.src = e.target.result; };
-  reader.onerror = () => { err.textContent = "No se pudo leer la foto, intenta de nuevo"; };
+  reader.onerror = () => onError();
   img.onload = () => {
     let { width, height } = img;
     const maxDim = 900;
@@ -120,13 +144,49 @@ function handlePhoto(event) {
     canvas.width = width;
     canvas.height = height;
     canvas.getContext("2d").drawImage(img, 0, 0, width, height);
-    photoDataUrl = canvas.toDataURL("image/jpeg", 0.72);
-
-    const preview = document.getElementById("photoPreview");
-    preview.src = photoDataUrl;
-    preview.style.display = "block";
+    onDone(canvas.toDataURL("image/jpeg", 0.72));
   };
   reader.readAsDataURL(file);
+}
+
+function handlePhoto(event) {
+  const file = event.target.files[0];
+  const err = document.getElementById("err");
+  err.textContent = "";
+  if (!file) {
+    photoDataUrl = "";
+    return;
+  }
+  resizeToDataUrl(
+    file,
+    (dataUrl) => {
+      photoDataUrl = dataUrl;
+      const preview = document.getElementById("photoPreview");
+      preview.src = dataUrl;
+      preview.style.display = "block";
+    },
+    () => { err.textContent = "No se pudo leer la foto, intenta de nuevo"; }
+  );
+}
+
+function handlePhotoPlaca(event) {
+  const file = event.target.files[0];
+  const err = document.getElementById("err");
+  err.textContent = "";
+  if (!file) {
+    photoPlacaDataUrl = "";
+    return;
+  }
+  resizeToDataUrl(
+    file,
+    (dataUrl) => {
+      photoPlacaDataUrl = dataUrl;
+      const preview = document.getElementById("photoPlacaPreview");
+      preview.src = dataUrl;
+      preview.style.display = "block";
+    },
+    () => { err.textContent = "No se pudo leer la foto, intenta de nuevo"; }
+  );
 }
 
 const sigCanvas = document.getElementById("signaturePad");
@@ -186,6 +246,10 @@ async function submitApplication() {
     err.textContent = "Tómate una foto contigo y tu moto";
     return;
   }
+  if (esFormalGenerico && !photoPlacaDataUrl) {
+    err.textContent = "Sube una foto de tu moto con la placa visible";
+    return;
+  }
   if (!document.getElementById("acceptLegal").checked) {
     err.textContent = "Debes aceptar el aviso legal para continuar";
     return;
@@ -195,11 +259,19 @@ async function submitApplication() {
     return;
   }
 
+  const grupo = viaLiderLink
+    ? grupoParam.trim()
+    : (esFormalGenerico ? document.getElementById("grupoInput").value.trim() : "");
+
   const vehicleType = document.getElementById("vehicleType").value;
   const res = await fetch("/api/chofer-solicitudes", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name, phone, photo: photoDataUrl, acceptedLegal: true, signature: sigCanvas.toDataURL("image/png"), vehicleType }),
+    body: JSON.stringify({
+      name, phone, photo: photoDataUrl, photoPlaca: photoPlacaDataUrl, acceptedLegal: true,
+      signature: sigCanvas.toDataURL("image/png"), vehicleType,
+      grupo, viaLiderLink, formalIntent: viaLiderLink || esFormalGenerico,
+    }),
   });
   if (!res.ok) {
     err.textContent = "No se pudo enviar, intenta de nuevo";
