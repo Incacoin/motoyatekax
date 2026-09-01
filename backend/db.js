@@ -262,4 +262,28 @@ try {
   // la columna ya existe
 }
 
+try {
+  db.exec("ALTER TABLE driver_applications ADD COLUMN grupo TEXT");
+} catch {
+  // la columna ya existe
+}
+
+try {
+  db.exec("ALTER TABLE driver_applications ADD COLUMN tipo TEXT NOT NULL DEFAULT 'informal'");
+} catch {
+  // la columna ya existe
+}
+
+try {
+  db.exec("ALTER TABLE driver_applications ADD COLUMN photo_placa TEXT");
+} catch {
+  // la columna ya existe
+}
+
+try {
+  db.exec("ALTER TABLE drivers ADD COLUMN photo_placa TEXT");
+} catch {
+  // la columna ya existe
+}
+
 module.exports = db;
