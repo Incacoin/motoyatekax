@@ -250,4 +250,16 @@ db.prepare(
   "UPDATE rides SET fee_settled_at = updated_at WHERE status = 'completado' AND fee_settled_at IS NULL AND date(updated_at) < date(?)"
 ).run(SERVICE_FEE_START_DATE);
 
+try {
+  db.exec("ALTER TABLE driver_applications ADD COLUMN signature TEXT");
+} catch {
+  // la columna ya existe
+}
+
+try {
+  db.exec("ALTER TABLE drivers ADD COLUMN signature TEXT");
+} catch {
+  // la columna ya existe
+}
+
 module.exports = db;
