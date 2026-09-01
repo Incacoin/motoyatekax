@@ -204,17 +204,23 @@ router.post("/drivers/photo", (req, res) => {
 });
 
 router.post("/chofer-solicitudes", (req, res) => {
-  const { name, phone, photo, acceptedLegal, vehicleType } = req.body;
+  const { name, phone, photo, acceptedLegal, signature, vehicleType } = req.body;
   if (!name || !phone || !photo) {
     return res.status(400).json({ error: "Falta nombre, teléfono o foto" });
   }
   if (!acceptedLegal) {
     return res.status(400).json({ error: "Debes aceptar el aviso legal para continuar" });
   }
+  // La firma en pantalla es la evidencia de que el chofer aceptó el Contrato
+  // de Prestación de Servicios, no solo el aviso legal (checkbox) — el
+  // contador la pidió como respaldo adicional, distinto del aviso legal.
+  if (typeof signature !== "string" || !/^data:image\/png;base64,/.test(signature)) {
+    return res.status(400).json({ error: "Falta tu firma" });
+  }
 
   db.prepare(
-    "INSERT INTO driver_applications (name, phone, photo, accepted_legal_at, accepted_legal_version, vehicle_type) VALUES (?, ?, ?, datetime('now'), ?, ?)"
-  ).run(name, phone, photo, AVISO_LEGAL_VERSION, vehicleType === "taxi" ? "taxi" : "moto");
+    "INSERT INTO driver_applications (name, phone, photo, accepted_legal_at, accepted_legal_version, vehicle_type, signature) VALUES (?, ?, ?, datetime('now'), ?, ?, ?)"
+  ).run(name, phone, photo, AVISO_LEGAL_VERSION, vehicleType === "taxi" ? "taxi" : "moto", signature);
   res.status(201).json({ ok: true });
 });
 
