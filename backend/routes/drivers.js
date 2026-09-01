@@ -204,7 +204,7 @@ router.post("/drivers/photo", (req, res) => {
 });
 
 router.post("/chofer-solicitudes", (req, res) => {
-  const { name, phone, photo, acceptedLegal, signature, vehicleType } = req.body;
+  const { name, phone, photo, photoPlaca, acceptedLegal, signature, vehicleType, grupo, viaLiderLink, formalIntent } = req.body;
   if (!name || !phone || !photo) {
     return res.status(400).json({ error: "Falta nombre, teléfono o foto" });
   }
@@ -218,9 +218,22 @@ router.post("/chofer-solicitudes", (req, res) => {
     return res.status(400).json({ error: "Falta tu firma" });
   }
 
+  // El link de un líder (?grupo=Nombre) trae el gremio ya fijo — el chofer no
+  // lo escribe, y no requiere placa (el líder ya lo avala). El link genérico
+  // de formales (?formal=1) sí deja que el chofer escriba a qué gremio dice
+  // pertenecer, y como nadie lo avaló, ahí sí se exige la foto de placa.
+  // Los informales (sin gremio) no la requieren: muchos no tienen placa.
+  const grupoLimpio = typeof grupo === "string" ? grupo.trim().slice(0, 60) : "";
+  const tipo = formalIntent ? "formal" : "informal";
+  const requierePlaca = formalIntent && !viaLiderLink;
+
+  if (requierePlaca && !photoPlaca) {
+    return res.status(400).json({ error: "Falta la foto de tu moto con la placa" });
+  }
+
   db.prepare(
-    "INSERT INTO driver_applications (name, phone, photo, accepted_legal_at, accepted_legal_version, vehicle_type, signature) VALUES (?, ?, ?, datetime('now'), ?, ?, ?)"
-  ).run(name, phone, photo, AVISO_LEGAL_VERSION, vehicleType === "taxi" ? "taxi" : "moto", signature);
+    "INSERT INTO driver_applications (name, phone, photo, photo_placa, accepted_legal_at, accepted_legal_version, vehicle_type, grupo, tipo, signature) VALUES (?, ?, ?, ?, datetime('now'), ?, ?, ?, ?, ?)"
+  ).run(name, phone, photo, photoPlaca || null, AVISO_LEGAL_VERSION, vehicleType === "taxi" ? "taxi" : "moto", grupoLimpio || null, tipo, signature);
   res.status(201).json({ ok: true });
 });
 
