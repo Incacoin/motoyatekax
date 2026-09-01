@@ -216,7 +216,7 @@
   <h1>Choferes registrados</h1>
   <div class="tipo-tabs" id="tipoTabs">
     <button class="active" onclick="setTipoFilter('todos')">Todos</button>
-    <button onclick="setTipoFilter('informal')">Informales</button>
+    <button onclick="setTipoFilter('informal')">Independientes</button>
     <button onclick="setTipoFilter('formal')">Formales</button>
   </div>
   <div class="table-wrap">
@@ -673,7 +673,7 @@ function setTipoFilter(tipo) {
 
 function tipoBadge(tipo) {
   const t = tipo === "formal" ? "formal" : "informal";
-  const label = t === "formal" ? "Formal" : "Informal";
+  const label = t === "formal" ? "Formal" : "Independiente";
   return `<span class="badge-tipo ${t}">${label}</span>`;
 }
 
@@ -681,7 +681,7 @@ function tipoSelect(id, tipo) {
   const t = tipo === "formal" ? "formal" : "informal";
   return `
     <select id="edit-tipo-${id}" class="tipo-select">
-      <option value="informal" ${t === "informal" ? "selected" : ""}>Informal</option>
+      <option value="informal" ${t === "informal" ? "selected" : ""}>Independiente</option>
       <option value="formal" ${t === "formal" ? "selected" : ""}>Formal</option>
     </select>`;
 }
