@@ -160,8 +160,26 @@
   </div>
 
   <div id="tabPanel-choferes" class="tab-panel">
-  <h1>Solicitudes de chofer</h1>
-  <p class="section-hint">Gente que se registró desde el QR de "Quiero ser chofer".</p>
+  <h1>🔗 Link / QR de registro</h1>
+  <p class="section-hint">Elige a quién va dirigido este QR.</p>
+  <div class="tipo-tabs" id="qrModeTabs">
+    <button class="active" onclick="setQrMode('informal')">Independiente (general)</button>
+    <button onclick="setQrMode('generico')">Formal genérico</button>
+    <button onclick="setQrMode('gremio')">Gremio específico</button>
+  </div>
+  <p class="section-hint" id="qrModeHint"></p>
+  <div class="field" id="qrGrupoField" style="display:none;">
+    <label>Gremio</label>
+    <input id="qrGrupo" placeholder="Nombre del gremio" oninput="updateQrLink()" />
+  </div>
+  <div class="card" style="text-align:center; padding:18px;">
+    <img id="qrImg" style="width:220px;height:220px;border-radius:8px;background:#fff;" />
+    <div id="qrLinkText" style="word-break:break-all;font-size:12.5px;color:var(--text-dim);margin-top:12px;"></div>
+    <button class="btn-sm" style="margin-top:10px;" onclick="copyQrLink()">Copiar link</button>
+  </div>
+
+  <h1 style="margin-top:30px;">Solicitudes de chofer</h1>
+  <p class="section-hint">Gente que se registró desde el link/QR de "Quiero ser chofer".</p>
   <div id="applicationsList"></div>
 
   <h1>Dar de alta un chofer</h1>
@@ -183,7 +201,7 @@
   </div>
   <div class="field">
     <label>Agrupación (opcional)</label>
-    <input id="driverGrupo" placeholder="Ej. Jaguares" />
+    <input id="driverGrupo" placeholder="Nombre del gremio" />
   </div>
   <div class="field">
     <label>Servicio</label>
@@ -301,7 +319,9 @@ let launchRankingCache = [];
 let driversCache = [];
 let applicationsCache = [];
 let pendingDriverPhoto = null;
+let pendingDriverPhotoPlaca = null;
 let pendingDriverSignature = null;
+let pendingDriverTipo = "formal";
 let lastRegistered = null;
 let editingId = null;
 let ridesPollTimer = null;
@@ -340,6 +360,42 @@ function showToast(msg) {
   el.classList.add("show");
   clearTimeout(showToast._t);
   showToast._t = setTimeout(() => el.classList.remove("show"), 3200);
+}
+
+let qrMode = "informal";
+
+const QR_MODE_HINTS = {
+  informal: "Cualquiera se registra sin gremio. Se le pide foto de placa como verificación.",
+  generico: "Sirve para cualquier gremio — el chofer escribe a cuál pertenece, pero como aún no lo avala su líder, también se le pide foto de placa.",
+  gremio: "Link fijo para un líder específico. Su gente entra ya marcada como formal de ese gremio y no se le pide foto de placa.",
+};
+
+function setQrMode(mode) {
+  qrMode = mode;
+  const modes = ["informal", "generico", "gremio"];
+  document.querySelectorAll("#qrModeTabs button").forEach((b, i) => {
+    b.classList.toggle("active", modes[i] === mode);
+  });
+  document.getElementById("qrGrupoField").style.display = mode === "gremio" ? "flex" : "none";
+  document.getElementById("qrModeHint").textContent = QR_MODE_HINTS[mode];
+  updateQrLink();
+}
+
+function updateQrLink() {
+  let link = `${location.origin}/quiero-ser-chofer.html`;
+  if (qrMode === "gremio") {
+    const grupo = document.getElementById("qrGrupo").value.trim();
+    link += grupo ? `?grupo=${encodeURIComponent(grupo)}` : "";
+  } else if (qrMode === "generico") {
+    link += "?formal=1";
+  }
+  document.getElementById("qrLinkText").textContent = link;
+  document.getElementById("qrImg").src = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(link)}`;
+}
+
+function copyQrLink() {
+  const link = document.getElementById("qrLinkText").textContent;
+  navigator.clipboard.writeText(link).then(() => showToast("Link copiado")).catch(() => showToast("No se pudo copiar"));
 }
 
 function waLink(phone, text) {
@@ -385,6 +441,7 @@ async function login() {
   loadStats();
   loadApplications();
   loadAlertas();
+  setQrMode("informal");
   clearInterval(ridesPollTimer);
   ridesPollTimer = setInterval(() => { loadRides(); loadStats(); loadApplications(); }, 4000);
 }
@@ -445,10 +502,12 @@ function renderApplications(apps) {
       <div class="card app-row">
         <div class="info">
           ${a.photo ? `<img class="thumb" src="${a.photo}" onclick="window.open('${a.photo}', '_blank')" />` : ""}
+          ${a.photo_placa ? `<img class="thumb" src="${a.photo_placa}" onclick="window.open('${a.photo_placa}', '_blank')" title="Foto de placa" />` : ""}
           ${a.signature ? `<img class="thumb" style="background:#fff" src="${a.signature}" onclick="window.open('${a.signature}', '_blank')" title="Firma" />` : ""}
           <div class="who">
             <span class="name">${a.name}</span>
-            <span class="meta">${a.phone} · ${timeAgo(a.created_at)} · ${vehicleTypeBadge(a.vehicle_type)}</span>
+            <span class="meta">${a.phone} · ${timeAgo(a.created_at)} · ${vehicleTypeBadge(a.vehicle_type)} ${tipoBadge(a.tipo)}</span>
+            ${a.grupo ? `<span class="meta">🤝 ${a.grupo}</span>` : ""}
           </div>
         </div>
         <div class="row-actions">
@@ -464,8 +523,11 @@ function useApplication(id) {
   if (!app) return;
   document.getElementById("driverName").value = app.name;
   document.getElementById("driverPhone").value = app.phone;
+  document.getElementById("driverGrupo").value = app.grupo || "";
   document.getElementById("driverVehicleType").value = app.vehicle_type === "taxi" ? "taxi" : "moto";
+  pendingDriverTipo = app.tipo === "formal" ? "formal" : "informal";
   pendingDriverPhoto = app.photo || null;
+  pendingDriverPhotoPlaca = app.photo_placa || null;
   pendingDriverSignature = app.signature || null;
   renderPendingPhotoPreview();
   document.getElementById("driverName").scrollIntoView({ behavior: "smooth", block: "center" });
@@ -475,7 +537,7 @@ function useApplication(id) {
 function renderPendingPhotoPreview() {
   const el = document.getElementById("pendingPhotoPreview");
   el.innerHTML = pendingDriverPhoto
-    ? `<img class="thumb" src="${pendingDriverPhoto}" /> ${pendingDriverSignature ? `<img class="thumb" style="background:#fff" src="${pendingDriverSignature}" title="Firma" />` : ""} <span class="ago">Se guardará con este chofer</span>`
+    ? `<img class="thumb" src="${pendingDriverPhoto}" /> ${pendingDriverPhotoPlaca ? `<img class="thumb" src="${pendingDriverPhotoPlaca}" title="Foto de placa" />` : ""} ${pendingDriverSignature ? `<img class="thumb" style="background:#fff" src="${pendingDriverSignature}" title="Firma" />` : ""} <span class="ago">Se guardará con este chofer</span>`
     : "";
 }
 
@@ -560,7 +622,7 @@ async function registerDriver() {
   const phone = document.getElementById("driverPhone").value.trim();
   const vehicle = document.getElementById("driverVehicle").value.trim();
   const grupo = document.getElementById("driverGrupo").value.trim();
-  const tipo = "formal";
+  const tipo = pendingDriverTipo;
   const vehicleType = document.getElementById("driverVehicleType").value;
   document.getElementById("err2").textContent = "";
 
@@ -576,7 +638,7 @@ async function registerDriver() {
   const res = await fetch(API + "/api/admin/drivers", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ adminPin, name, phone, vehicle, grupo, tipo, vehicleType, acceptedLegal: true, photo: pendingDriverPhoto, signature: pendingDriverSignature }),
+    body: JSON.stringify({ adminPin, name, phone, vehicle, grupo, tipo, vehicleType, acceptedLegal: true, photo: pendingDriverPhoto, photoPlaca: pendingDriverPhotoPlaca, signature: pendingDriverSignature }),
   });
   if (!res.ok) {
     document.getElementById("err2").textContent = (await res.json()).error;
@@ -597,7 +659,9 @@ async function registerDriver() {
   document.getElementById("driverAcceptedLegal").checked = false;
   document.getElementById("driverPhotoInput").value = "";
   pendingDriverPhoto = null;
+  pendingDriverPhotoPlaca = null;
   pendingDriverSignature = null;
+  pendingDriverTipo = "formal";
   renderPendingPhotoPreview();
 
   loadDrivers();
@@ -755,11 +819,14 @@ function renderDriverRows() {
     const vouchLabel = d.vouched_by
       ? `<div class="avalado">avalado ${d.vouched_at ? "el " + d.vouched_at : ""}</div>`
       : `<div class="sin-aval">sin aval</div>`;
+    const placaThumb = d.photo_placa
+      ? `<img class="thumb" src="${d.photo_placa}" onclick="window.open('${d.photo_placa}', '_blank')" title="Foto de placa" />`
+      : "";
     const sigThumb = d.signature
       ? `<img class="thumb" style="background:#fff" src="${d.signature}" onclick="window.open('${d.signature}', '_blank')" title="Firma del contrato" />`
       : "";
     const nameCell = d.photo
-      ? `<div class="info"><img class="thumb" src="${d.photo}" onclick="window.open('${d.photo}', '_blank')" />${sigThumb}<span>${d.name}</span></div>`
+      ? `<div class="info"><img class="thumb" src="${d.photo}" onclick="window.open('${d.photo}', '_blank')" />${placaThumb}${sigThumb}<span>${d.name}</span></div>`
       : d.name;
     return `
     <tr>
