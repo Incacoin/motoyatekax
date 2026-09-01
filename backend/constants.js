@@ -1,5 +1,5 @@
 module.exports = {
-  AVISO_LEGAL_VERSION: "2026-08-18",
+  AVISO_LEGAL_VERSION: "2026-09-01",
   LAUNCH_DATE: "2026-08-14",
   // Cuota mensual por chofer, igual que en Ticul.
   MONTHLY_FEE: 100,
