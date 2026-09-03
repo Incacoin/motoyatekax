@@ -332,4 +332,14 @@ try {
 }
 db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_riders_pin ON riders(pin) WHERE pin IS NOT NULL");
 
+// Cuenta las veces que un chofer canceló un viaje de este pasajero con el
+// motivo exacto "El pasajero no llegó" — mismo patrón que cancel_count en
+// drivers. Es solo un contador (nadie se bloquea automático); el admin lo ve
+// en Pasajeros/Alertas y decide si contacta o restringe manualmente.
+try {
+  db.exec("ALTER TABLE riders ADD COLUMN no_show_count INTEGER NOT NULL DEFAULT 0");
+} catch {
+  // la columna ya existe
+}
+
 module.exports = db;
