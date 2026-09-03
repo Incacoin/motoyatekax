@@ -249,7 +249,7 @@
   <div class="table-wrap">
     <table>
       <thead>
-        <tr><th>Nombre</th><th>Teléfono</th><th>PIN</th><th>Viajes completados</th><th>Registrado</th><th>Último viaje</th><th></th></tr>
+        <tr><th>Nombre</th><th>Teléfono</th><th>PIN</th><th>Viajes completados</th><th>No llegó</th><th>Registrado</th><th>Último viaje</th><th></th></tr>
       </thead>
       <tbody id="riderRows"></tbody>
     </table>
@@ -298,6 +298,21 @@
         <tr><th>Chofer</th><th>Pasajero</th><th>Teléfono</th><th>Veces</th><th>Última vez</th></tr>
       </thead>
       <tbody id="alertaParRows"></tbody>
+    </table>
+  </div>
+
+  <h1 style="margin-top:24px;">🚫 Pasajeros que no llegaron</h1>
+  <p class="section-hint">
+    Pasajeros donde un chofer canceló con el motivo exacto "El pasajero no llegó" 2 veces o más.
+    No se bloquean solos — puede ser una broma repetida o el chofer equivocando la ubicación. Revisa
+    y decide tú si contactas o restringes desde aquí.
+  </p>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Pasajero</th><th>Teléfono</th><th>Veces "no llegó"</th></tr>
+      </thead>
+      <tbody id="alertaNoShowRows"></tbody>
     </table>
   </div>
   </div>
@@ -464,7 +479,7 @@ async function loadAlertas() {
     body: JSON.stringify({ adminPin }),
   });
   if (!res.ok) return;
-  const { porChofer, paresRepetidos } = await res.json();
+  const { porChofer, paresRepetidos, inasistencias } = await res.json();
 
   document.getElementById("alertaChoferRows").innerHTML = porChofer.length
     ? porChofer.map((d) => `
@@ -487,6 +502,15 @@ async function loadAlertas() {
         <td>${timeAgo(p.ultima_vez)}</td>
       </tr>`).join("")
     : `<tr><td colspan="5" class="ago">Nada que revisar por ahora.</td></tr>`;
+
+  document.getElementById("alertaNoShowRows").innerHTML = inasistencias.length
+    ? inasistencias.map((r) => `
+      <tr>
+        <td>${r.name || "—"}</td>
+        <td>${r.phone}</td>
+        <td><span class="pct-badge alto">${r.no_show_count}</span></td>
+      </tr>`).join("")
+    : `<tr><td colspan="3" class="ago">Nada que revisar por ahora.</td></tr>`;
 }
 
 async function loadApplications() {
@@ -702,10 +726,11 @@ function renderRiderRows() {
       <td>${r.phone}</td>
       <td>${r.pin || "—"}</td>
       <td>${r.trips}</td>
+      <td>${r.no_show_count >= 2 ? `<span style="color:#e05d5d;font-weight:600;">${r.no_show_count} ⚠️</span>` : (r.no_show_count || 0)}</td>
       <td>${r.created_at ? r.created_at.slice(0, 10) : ""}</td>
       <td>${r.last_ride_at ? r.last_ride_at.slice(0, 10) : "—"}</td>
       <td><button class="btn-sm" onclick="resetRiderPin(${r.id})">Restablecer PIN</button></td>
-    </tr>`).join("") || `<tr><td colspan="7" class="ago">Todavía no hay pasajeros registrados.</td></tr>`;
+    </tr>`).join("") || `<tr><td colspan="8" class="ago">Todavía no hay pasajeros registrados.</td></tr>`;
 }
 
 async function resetRiderPin(id) {
