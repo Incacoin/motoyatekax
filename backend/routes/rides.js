@@ -260,6 +260,14 @@ router.post("/rides/:id/cancel", (req, res) => {
       db.prepare(
         "UPDATE drivers SET status = 'disponible', cancel_count = cancel_count + 1, cooldown_until = ? WHERE id = ?"
       ).run(cooldownUntil, ride.driver_id);
+      // Motivo exacto del botón "El pasajero no llegó" en chofer.html — cuenta
+      // contra el pasajero, no contra el chofer. Sin rider_id (viajes viejos)
+      // no hay a quién cargárselo.
+      if (reason === "El pasajero no llegó" && ride.rider_id) {
+        db.prepare("UPDATE riders SET no_show_count = no_show_count + 1 WHERE id = ?").run(
+          ride.rider_id
+        );
+      }
     } else {
       db.prepare("UPDATE drivers SET status = 'disponible' WHERE id = ?").run(
         ride.driver_id
