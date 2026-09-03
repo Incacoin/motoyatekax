@@ -36,7 +36,7 @@
 <body>
 
 <div class="topbar">
-  <div class="brand"><span class="brand-icon">🛵</span>MotoYaTekax</div>
+  <div class="brand"><span class="brand-icon">🛵</span>MotoYa<span class="cityLabel"> Tekax</span></div>
   <div id="riderName"></div>
   <div id="statusText">Cargando viaje...</div>
   <div id="etaText"></div>
@@ -47,7 +47,7 @@
 <div id="driverCard" class="card fade-in"></div>
 
 <div id="errorScreen">
-  <div class="brand"><span class="brand-icon">🛵</span>MotoYaTekax</div>
+  <div class="brand"><span class="brand-icon">🛵</span>MotoYa<span class="cityLabel"> Tekax</span></div>
   <p id="errorText" style="color:var(--text-dim);"></p>
 </div>
 
@@ -263,6 +263,10 @@ async function init() {
   } catch {
     showError("No se pudo cargar el viaje. Revisa tu conexión."); return;
   }
+
+  const cityLabel = ride.city === "ticul" ? "Ticul" : "Tekax";
+  document.querySelectorAll(".cityLabel").forEach((el) => (el.textContent = " " + cityLabel));
+  document.title = document.title.replace(/Tekax/, cityLabel);
 
   serviceType = ride.ride_type === "taxi" ? "taxi" : "moto";
   pickup = { lat: ride.pickup_lat, lng: ride.pickup_lng };

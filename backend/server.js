@@ -9,10 +9,12 @@ if (fs.existsSync(path.join(__dirname, ".env"))) {
 
 const db = require("./db");
 const driverRoutes = require("./routes/drivers");
+const riderRoutes = require("./routes/riders");
 const rideRoutes = require("./routes/rides");
 const adminRoutes = require("./routes/admin");
 const realtime = require("./realtime");
 const { startBackupSchedule } = require("./backup");
+const { CITIES, resolveCity } = require("./cities");
 
 const app = express();
 // Render (y cualquier proxy delante del server) reenvía la IP real del
@@ -32,7 +34,22 @@ app.get("/api/health", (req, res) => {
   }
 });
 
+app.get("/api/cities", (req, res) => {
+  res.json(CITIES);
+});
+
+// A qué ciudad de la red pertenece esta coordenada (o null si está fuera de
+// todas). El frontend lo usa para mostrar "Estás en Ticul" en vez de tener
+// el nombre de una sola ciudad escrito a mano en toda la app.
+app.get("/api/cities/resolve", (req, res) => {
+  const lat = parseFloat(req.query.lat);
+  const lng = parseFloat(req.query.lng);
+  const city = resolveCity(lat, lng);
+  res.json(city ? { city: city.id, label: city.label } : { city: null, label: null });
+});
+
 app.use("/api", driverRoutes);
+app.use("/api", riderRoutes);
 app.use("/api", rideRoutes);
 app.use("/api", adminRoutes);
 

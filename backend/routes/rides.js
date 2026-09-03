@@ -1,13 +1,15 @@
 const express = require("express");
 const db = require("../db");
 const realtime = require("../realtime");
+const { resolveCity, DEFAULT_CITY_ID } = require("../cities");
+const { isRateLimited, recordFailedAttempt, clearAttempts, RATE_LIMIT_MESSAGE } = require("../pinRateLimit");
 
 const router = express.Router();
 
 router.post("/rides", (req, res) => {
   const {
-    rider_name,
     rider_phone,
+    rider_pin,
     pickup_lat,
     pickup_lng,
     pickup_label,
@@ -19,20 +21,36 @@ router.post("/rides", (req, res) => {
     ride_type,
   } = req.body;
 
-  if (!rider_name || !rider_phone || pickup_lat == null || pickup_lng == null) {
+  if (!rider_phone || !rider_pin || pickup_lat == null || pickup_lng == null) {
     return res.status(400).json({ error: "Faltan datos del viaje" });
   }
 
-  db.prepare(
-    `INSERT INTO riders (phone, name, last_ride_at) VALUES (?, ?, datetime('now'))
-     ON CONFLICT(phone) DO UPDATE SET name = excluded.name, last_ride_at = excluded.last_ride_at`
-  ).run(rider_phone, rider_name);
-  const rider = db.prepare("SELECT id FROM riders WHERE phone = ?").get(rider_phone);
+  // El nombre y el teléfono del viaje salen de la cuenta ya autenticada, no
+  // de lo que mande el navegador — así nadie puede pedir un viaje "como si
+  // fuera" el teléfono de alguien más sin saber su PIN.
+  if (isRateLimited(req.ip)) {
+    return res.status(429).json({ error: RATE_LIMIT_MESSAGE });
+  }
+  const rider = db
+    .prepare("SELECT id, name, phone FROM riders WHERE phone = ? AND pin = ?")
+    .get(rider_phone, rider_pin);
+  if (!rider) {
+    recordFailedAttempt(req.ip);
+    return res.status(401).json({ error: "Teléfono o PIN incorrectos" });
+  }
+  clearAttempts(req.ip);
+  const rider_name = rider.name;
+
+  db.prepare("UPDATE riders SET last_ride_at = datetime('now') WHERE id = ?").run(rider.id);
+
+  // La ciudad del viaje es la de la recogida (no la de quien lo pide desde su
+  // celular) — es lo que decide a qué admin/red le toca ese viaje.
+  const city = resolveCity(pickup_lat, pickup_lng)?.id || DEFAULT_CITY_ID;
 
   const result = db
     .prepare(
-      `INSERT INTO rides (rider_name, rider_phone, rider_id, pickup_lat, pickup_lng, pickup_label, dest_lat, dest_lng, dest_label, passengers, children, ride_type)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO rides (rider_name, rider_phone, rider_id, pickup_lat, pickup_lng, pickup_label, dest_lat, dest_lng, dest_label, passengers, children, ride_type, city)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       rider_name,
@@ -46,7 +64,8 @@ router.post("/rides", (req, res) => {
       dest_label || null,
       passengers || 1,
       children || 0,
-      ride_type === "taxi" ? "taxi" : "moto"
+      ride_type === "taxi" ? "taxi" : "moto",
+      city
     );
 
   const ride = db

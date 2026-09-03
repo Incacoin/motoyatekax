@@ -3,6 +3,7 @@ const db = require("../db");
 const { AVISO_LEGAL_VERSION, MAX_MATCH_DISTANCE_KM, SERVICE_CENTER, DRIVER_STALE_SECONDS, SERVICE_FEE, MONTHLY_FEE, TRIAL_END_DATE } = require("../constants");
 const { haversineKm } = require("../geo");
 const { isRateLimited, recordFailedAttempt, clearAttempts, RATE_LIMIT_MESSAGE } = require("../pinRateLimit");
+const { DEFAULT_CITY_ID, getCityById } = require("../cities");
 
 const router = express.Router();
 
@@ -204,7 +205,8 @@ router.post("/drivers/photo", (req, res) => {
 });
 
 router.post("/chofer-solicitudes", (req, res) => {
-  const { name, phone, photo, photoPlaca, acceptedLegal, signature, vehicleType, grupo, viaLiderLink, formalIntent } = req.body;
+  const { name, phone, photo, photoPlaca, acceptedLegal, signature, vehicleType, grupo, viaLiderLink, formalIntent, city } = req.body;
+  const cityId = getCityById(city) ? city : DEFAULT_CITY_ID;
   if (!name || !phone || !photo) {
     return res.status(400).json({ error: "Falta nombre, teléfono o foto" });
   }
@@ -232,8 +234,8 @@ router.post("/chofer-solicitudes", (req, res) => {
   }
 
   db.prepare(
-    "INSERT INTO driver_applications (name, phone, photo, photo_placa, accepted_legal_at, accepted_legal_version, vehicle_type, grupo, tipo, signature) VALUES (?, ?, ?, ?, datetime('now'), ?, ?, ?, ?, ?)"
-  ).run(name, phone, photo, photoPlaca || null, AVISO_LEGAL_VERSION, vehicleType === "taxi" ? "taxi" : "moto", grupoLimpio || null, tipo, signature);
+    "INSERT INTO driver_applications (name, phone, photo, photo_placa, accepted_legal_at, accepted_legal_version, vehicle_type, grupo, tipo, signature, city) VALUES (?, ?, ?, ?, datetime('now'), ?, ?, ?, ?, ?, ?)"
+  ).run(name, phone, photo, photoPlaca || null, AVISO_LEGAL_VERSION, vehicleType === "taxi" ? "taxi" : "moto", grupoLimpio || null, tipo, signature, cityId);
   res.status(201).json({ ok: true });
 });
 

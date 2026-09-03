@@ -1,5 +1,8 @@
 module.exports = {
-  AVISO_LEGAL_VERSION: "2026-09-01",
+  // Sube esta fecha cada vez que cambie el TEXTO del aviso legal o el
+  // contrato (no por cambios de marca/cosméticos) — es lo que queda grabado
+  // como "versión que aceptó" cada chofer al registrarse.
+  AVISO_LEGAL_VERSION: "2026-09-02",
   LAUNCH_DATE: "2026-08-14",
   // Cuota mensual por chofer, igual que en Ticul.
   MONTHLY_FEE: 100,

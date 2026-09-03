@@ -18,10 +18,11 @@
   .phoneRow input { flex: 1; }
   .fieldHint { font-size: 12.5px; color: var(--text-dim); line-height: 1.45; margin: 0 0 8px; }
   .fieldHint a { color: var(--accent); }
-  #photoPreview, #photoPlacaPreview { display: none; width: 100%; max-height: 220px; object-fit: cover; border-radius: var(--radius-sm); margin-top: 10px; border: 1px solid var(--border); }
+  #photoPreview { display: none; width: 100%; max-height: 220px; object-fit: cover; border-radius: var(--radius-sm); margin-top: 10px; border: 1px solid var(--border); }
   #err { color: var(--danger); min-height: 18px; font-size: 13.5px; margin-top: 4px; }
   .legalCheck { display: flex; align-items: flex-start; gap: 8px; font-size: 12.5px; color: var(--text-dim); line-height: 1.5; cursor: pointer; }
-  .legalCheck input { margin-top: 3px; flex-shrink: 0; }
+  .legalCheck input { width: auto; margin-top: 3px; flex-shrink: 0; }
+  .legalCheck span { flex: 1; min-width: 0; }
   .legalCheck a { color: var(--accent); }
   #signaturePad { width: 100%; height: auto; display: block; background: #fff; border: 1px solid var(--border); border-radius: var(--radius-sm); touch-action: none; }
   .sigActions { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; }
@@ -33,23 +34,28 @@
   #okScreen p { color: var(--text-dim); font-size: 14px; line-height: 1.5; margin: 0; }
   .credit { margin-top: 22px; }
   button.btn { width: 100%; }
-  #grupoBanner, #formalGenericoBanner { display: none; background: rgba(46, 204, 113, 0.12); border: 1px solid rgba(46, 204, 113, 0.35); border-radius: var(--radius-sm); padding: 10px 12px; font-size: 13.5px; color: var(--text); margin-bottom: 18px; line-height: 1.5; }
-  #grupoBanner strong { color: var(--success); }
-  #grupoInputField { display: none; }
 </style>
 </head>
 <body>
 
 <div class="wrap">
   <div id="formScreen">
-    <p class="brand"><span class="brand-icon">🛵</span>MotoYaTekax</p>
-    <p class="lead">Regístrate como conductor y empieza a recibir viajes en Tekax. Déjanos tu nombre y teléfono — te contactamos por WhatsApp para completar tu alta y darte tu PIN.</p>
-    <div id="grupoBanner">🤝 Te registras con el aval de: <strong id="grupoNombre"></strong></div>
-    <div id="formalGenericoBanner">🤝 Registro para choferes de gremio formal. Tu líder deberá confirmarlo antes de darte de alta.</div>
-    <div class="field" id="grupoInputField">
-      <label>¿De qué gremio o agrupación eres?</label>
-      <input id="grupoInput" placeholder="Nombre del gremio" />
-    </div>
+    <svg width="152" height="106" viewBox="0 0 200 140" fill="none" style="display:block;margin:0 auto 6px;">
+      <rect x="20" y="110" width="160" height="20" stroke="var(--accent)" stroke-width="1.6" opacity="0.8"/>
+      <rect x="35" y="90" width="130" height="20" stroke="var(--accent)" stroke-width="1.6" opacity="0.8"/>
+      <rect x="50" y="70" width="100" height="20" stroke="var(--accent)" stroke-width="1.6" opacity="0.8"/>
+      <rect x="65" y="50" width="70" height="20" stroke="var(--accent)" stroke-width="1.6" opacity="0.8"/>
+      <rect x="82" y="28" width="36" height="22" stroke="var(--accent)" stroke-width="1.6" opacity="0.8"/>
+      <rect x="95" y="36" width="10" height="14" stroke="var(--accent)" stroke-width="1.4" opacity="0.8"/>
+      <line x1="92" y1="50" x2="92" y2="130" stroke="var(--accent)" stroke-width="1.4" opacity="0.8"/>
+      <line x1="108" y1="50" x2="108" y2="130" stroke="var(--accent)" stroke-width="1.4" opacity="0.8"/>
+      <line x1="92" y1="65" x2="108" y2="65" stroke="var(--accent)" stroke-width="1.2" opacity="0.8"/>
+      <line x1="92" y1="85" x2="108" y2="85" stroke="var(--accent)" stroke-width="1.2" opacity="0.8"/>
+      <line x1="92" y1="105" x2="108" y2="105" stroke="var(--accent)" stroke-width="1.2" opacity="0.8"/>
+      <line x1="10" y1="130" x2="190" y2="130" stroke="var(--accent)" stroke-width="1.6" opacity="0.8"/>
+    </svg>
+    <p class="brand"><span class="brand-icon">🛵</span>MotoYa<span id="cityLabel"> Tekax</span></p>
+    <p class="lead">Regístrate como conductor y empieza a recibir viajes en <span id="cityLabelInline">Tekax</span>. Déjanos tu nombre y teléfono — te contactamos por WhatsApp para completar tu alta y darte tu PIN.</p>
 
     <div class="field">
       <label>Nombre completo</label>
@@ -61,6 +67,13 @@
         <span class="prefix">+52</span>
         <input id="phone" placeholder="10 dígitos" inputmode="numeric" maxlength="10" oninput="this.value = this.value.replace(/\D/g, '')" />
       </div>
+    </div>
+    <div class="field" id="manualCityField" style="display:none;">
+      <label>¿En qué ciudad vas a trabajar?</label>
+      <select id="manualCitySelect" onchange="applyManualCity()">
+        <option value="tekax">Tekax</option>
+        <option value="ticul">Ticul</option>
+      </select>
     </div>
     <div class="field">
       <label>¿Con qué vehículo trabajas?</label>
@@ -75,21 +88,15 @@
       <input type="file" id="photo" accept="image/*" capture="environment" onchange="handlePhoto(event)" />
       <img id="photoPreview" />
     </div>
-    <div class="field" id="placaField">
-      <label id="placaLabel">Foto de tu moto y placa</label>
-      <p class="fieldHint" id="placaHint">Tómala de frente, con la placa bien visible y legible.</p>
-      <input type="file" id="photoPlaca" accept="image/*" capture="environment" onchange="handlePhotoPlaca(event)" />
-      <img id="photoPlacaPreview" />
-    </div>
     <div class="field legalField">
       <label class="legalCheck">
         <input type="checkbox" id="acceptLegal" />
-        He leído y acepto el <a href="aviso-legal.html" target="_blank" rel="noopener">Aviso Legal de MotoYaTekax</a>. Entiendo que opero como conductor independiente, bajo mi propia responsabilidad.
+        <span>He leído y acepto el <a href="aviso-legal.html" target="_blank" rel="noopener">Aviso Legal de MotoYa</a>. Entiendo que opero como conductor independiente, bajo mi propia responsabilidad.</span>
       </label>
     </div>
     <div class="field">
       <label>Firma de aceptación</label>
-      <p class="fieldHint">Firma aquí con el dedo para aceptar el <a href="contrato-prestacion-servicios.html" target="_blank" rel="noopener">Contrato de Prestación de Servicios</a> de MotoYaTekax.</p>
+      <p class="fieldHint">Firma aquí con el dedo para aceptar el <a href="contrato-prestacion-servicios.html" target="_blank" rel="noopener">Contrato de Prestación de Servicios</a> de MotoYa.</p>
       <canvas id="signaturePad" width="600" height="200"></canvas>
       <div class="sigActions">
         <span id="sigStatus">Sin firmar</span>
@@ -111,24 +118,51 @@
 
 <script>
 let photoDataUrl = "";
-let photoPlacaDataUrl = "";
-const grupoParam = new URLSearchParams(location.search).get("grupo");
-const formalGenericoParam = new URLSearchParams(location.search).get("formal") === "1";
-const viaLiderLink = !!(grupoParam && grupoParam.trim());
-const esFormalGenerico = !viaLiderLink && formalGenericoParam;
 
-if (viaLiderLink) {
-  document.getElementById("grupoNombre").textContent = grupoParam.trim();
-  document.getElementById("grupoBanner").style.display = "block";
-  document.getElementById("placaField").style.display = "none";
-} else if (esFormalGenerico) {
-  document.getElementById("formalGenericoBanner").style.display = "block";
-  document.getElementById("grupoInputField").style.display = "flex";
-} else {
-  document.getElementById("placaLabel").textContent = "Foto de tu unidad con placa (si tiene)";
-  document.getElementById("placaHint").textContent = "Si tu unidad no tiene placa, no hay problema — puedes omitir este paso.";
+// Ciudad detectada por GPS al momento de aplicar — así el admin ya ve de
+// entrada a qué ciudad pertenece este chofer al revisar la solicitud, en vez
+// de tener que preguntarle. Si no hay GPS, lo niega, o cae fuera de la red,
+// le mostramos un selector para que la elija él mismo — así nunca cae por
+// default en la cola de la ciudad equivocada.
+let detectedCity = "";
+let resolvedCityLabel = "Tekax";
+
+function applyCityFromDetection(city, label) {
+  detectedCity = city;
+  resolvedCityLabel = label;
+  document.querySelectorAll("#cityLabel").forEach((el) => (el.textContent = " " + label));
+  document.getElementById("cityLabelInline").textContent = label;
+  document.title = document.title.replace(/Tekax/, label);
 }
 
+function showManualCityPicker() {
+  document.getElementById("manualCityField").style.display = "flex";
+  applyManualCity(); // sincroniza con lo que ya se ve seleccionado por default
+}
+
+function applyManualCity() {
+  const select = document.getElementById("manualCitySelect");
+  const label = select.value === "ticul" ? "Ticul" : "Tekax";
+  applyCityFromDetection(select.value, label);
+}
+
+if (navigator.geolocation) {
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      fetch(`/api/cities/resolve?lat=${pos.coords.latitude}&lng=${pos.coords.longitude}`)
+        .then((r) => r.json())
+        .then((data) => {
+          if (!data.city) { showManualCityPicker(); return; }
+          applyCityFromDetection(data.city, data.label);
+        })
+        .catch(() => showManualCityPicker());
+    },
+    () => showManualCityPicker(),
+    { maximumAge: 300000, timeout: 5000 }
+  );
+} else {
+  showManualCityPicker();
+}
 function resizeToDataUrl(file, onDone, onError) {
   const img = new Image();
   const reader = new FileReader();
@@ -162,26 +196,6 @@ function handlePhoto(event) {
     (dataUrl) => {
       photoDataUrl = dataUrl;
       const preview = document.getElementById("photoPreview");
-      preview.src = dataUrl;
-      preview.style.display = "block";
-    },
-    () => { err.textContent = "No se pudo leer la foto, intenta de nuevo"; }
-  );
-}
-
-function handlePhotoPlaca(event) {
-  const file = event.target.files[0];
-  const err = document.getElementById("err");
-  err.textContent = "";
-  if (!file) {
-    photoPlacaDataUrl = "";
-    return;
-  }
-  resizeToDataUrl(
-    file,
-    (dataUrl) => {
-      photoPlacaDataUrl = dataUrl;
-      const preview = document.getElementById("photoPlacaPreview");
       preview.src = dataUrl;
       preview.style.display = "block";
     },
@@ -246,10 +260,6 @@ async function submitApplication() {
     err.textContent = "Tómate una foto contigo y tu moto";
     return;
   }
-  if (esFormalGenerico && !photoPlacaDataUrl) {
-    err.textContent = "Sube una foto de tu moto con la placa visible";
-    return;
-  }
   if (!document.getElementById("acceptLegal").checked) {
     err.textContent = "Debes aceptar el aviso legal para continuar";
     return;
@@ -259,18 +269,13 @@ async function submitApplication() {
     return;
   }
 
-  const grupo = viaLiderLink
-    ? grupoParam.trim()
-    : (esFormalGenerico ? document.getElementById("grupoInput").value.trim() : "");
-
   const vehicleType = document.getElementById("vehicleType").value;
   const res = await fetch("/api/chofer-solicitudes", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      name, phone, photo: photoDataUrl, photoPlaca: photoPlacaDataUrl, acceptedLegal: true,
-      signature: sigCanvas.toDataURL("image/png"), vehicleType,
-      grupo, viaLiderLink, formalIntent: viaLiderLink || esFormalGenerico,
+      name, phone, photo: photoDataUrl, acceptedLegal: true,
+      signature: sigCanvas.toDataURL("image/png"), vehicleType, city: detectedCity,
     }),
   });
   if (!res.ok) {

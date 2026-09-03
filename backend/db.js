@@ -1,8 +1,15 @@
+const fs = require("node:fs");
 const path = require("node:path");
 const { DatabaseSync } = require("node:sqlite");
 const { SERVICE_FEE_START_DATE } = require("./constants");
 
-const dbPath = path.join(__dirname, "data", "motoya.db");
+// En un clon nuevo (o un deploy limpio) esta carpeta no existe todavía —
+// sin esto, SQLite no puede crear el archivo y truena con "unable to open
+// database file".
+const dataDir = path.join(__dirname, "data");
+fs.mkdirSync(dataDir, { recursive: true });
+
+const dbPath = path.join(dataDir, "motoya.db");
 const db = new DatabaseSync(dbPath);
 
 db.exec(`
@@ -285,5 +292,44 @@ try {
 } catch {
   // la columna ya existe
 }
+
+// Ciudad "de casa" de cada quien — de dónde es, no necesariamente dónde está
+// parado ahora mismo (eso se resuelve por GPS en tiempo real, ver cities.js).
+// Todo lo que ya existía en esta base es de Tekax, por eso el default.
+try {
+  db.exec("ALTER TABLE drivers ADD COLUMN city TEXT NOT NULL DEFAULT 'tekax'");
+} catch {
+  // la columna ya existe
+}
+
+try {
+  db.exec("ALTER TABLE riders ADD COLUMN city TEXT NOT NULL DEFAULT 'tekax'");
+} catch {
+  // la columna ya existe
+}
+
+try {
+  db.exec("ALTER TABLE rides ADD COLUMN city TEXT NOT NULL DEFAULT 'tekax'");
+} catch {
+  // la columna ya existe
+}
+
+try {
+  db.exec("ALTER TABLE driver_applications ADD COLUMN city TEXT NOT NULL DEFAULT 'tekax'");
+} catch {
+  // la columna ya existe
+}
+
+// PIN del pasajero — igual que el del chofer, es lo que convierte "cualquiera
+// escribe cualquier teléfono" en una cuenta real: una vez que un teléfono
+// tiene PIN, hace falta para volver a usarlo. Nullable porque los riders que
+// ya existían antes de esto (de antes de esta función) no tienen uno todavía
+// — lo reciben la próxima vez que usen ese teléfono (ver routes/riders.js).
+try {
+  db.exec("ALTER TABLE riders ADD COLUMN pin TEXT");
+} catch {
+  // la columna ya existe
+}
+db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_riders_pin ON riders(pin) WHERE pin IS NOT NULL");
 
 module.exports = db;

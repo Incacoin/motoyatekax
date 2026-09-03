@@ -5,18 +5,18 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
 <title>MotoYaTekax Chofer</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%9B%BA%3C/text%3E%3C/svg%3E" />
-<link rel="manifest" href="manifest-chofer.json" />
+<link rel="manifest" href="manifest.json" />
 <meta name="theme-color" content="#f6a623" />
 <link rel="apple-touch-icon" href="icons/icon-512.png" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<meta name="apple-mobile-web-app-title" content="Chofer Tekax" />
+<meta name="apple-mobile-web-app-title" content="MotoYa Chofer" />
 <script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});</script>
 <link rel="stylesheet" href="style.css" />
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
-  #login { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; gap: 16px; padding: 24px; text-align: center; }
+  #login { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow-y: auto; gap: 16px; padding: 24px 24px 90px; text-align: center; }
   #login input { font-size: 26px; padding: 14px; text-align: center; letter-spacing: 6px; width: 200px; }
   #loginError { color: var(--danger); min-height: 18px; font-size: 14px; }
   .installBanner { position: absolute; top: 14px; left: 14px; right: 14px; padding: 12px 14px; display: flex; align-items: center; gap: 10px; text-align: left; font-size: 13.5px; }
@@ -38,7 +38,7 @@
   .empty { text-align: center; color: var(--text-faint); padding: 26px 12px; font-size: 14px; }
   #switch { position: relative; width: 52px; height: 30px; background: #2a2e38; border-radius: 20px; cursor: pointer; transition: background 0.2s ease; }
   #switch .knob { position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 50%; background: #cfd3db; transition: left 0.18s ease, background 0.18s ease; box-shadow: 0 2px 6px rgba(0,0,0,0.3); }
-  #switch.on { background: var(--success); }
+  #switch.on { background: linear-gradient(180deg, #34d47f, var(--success)); box-shadow: inset 0 1px 3px rgba(0,0,0,0.25), 0 0 0 3px rgba(46,204,113,0.18); }
   #switch.on .knob { left: 25px; background: #fff; }
   .footer-credit { padding: 10px 0 4px; }
   @keyframes pulseReady { 0%, 100% { box-shadow: 0 0 0 0 rgba(246,166,35,.55); } 50% { box-shadow: 0 0 0 8px rgba(246,166,35,0); } }
@@ -80,8 +80,10 @@
   .stat .l { font-size: 11.5px; color: var(--text-dim); margin-top: 2px; line-height: 1.25; }
   .profile-note { font-size: 12.5px; color: var(--text-faint); line-height: 1.45; }
   .pin-box { font-family: ui-monospace, monospace; font-size: 22px; letter-spacing: 5px; font-weight: 800; color: var(--accent); }
-  #profileAvatarBtn { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; cursor: pointer; background: none; border: none; padding: 0; }
-  #profileAvatarBtn .circle { width: 32px; height: 32px; border-radius: 50%; border: 2px solid var(--accent); background: var(--bg-card); display: flex; align-items: center; justify-content: center; }
+  #profileAvatarBtn, #modePasajeroBtn { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; cursor: pointer; background: none; border: none; padding: 0; }
+  #profileAvatarBtn .circle, #modePasajeroBtn .circle { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 15px; }
+  #modePasajeroBtn .circle { border: 2px solid var(--accent); background: var(--bg-card); }
+  #profileAvatarBtn .circle { background: linear-gradient(155deg, var(--accent-light), var(--accent) 60%, var(--accent-dark)); box-shadow: 0 6px 14px -4px rgba(246, 166, 35, 0.5); }
   .profile-stars-row { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: -6px; }
   .profile-stars-row .stars { display: flex; gap: 1px; }
   .menu-row { display: flex; align-items: center; gap: 12px; padding: 12px 4px; cursor: pointer; text-decoration: none; color: var(--text); background: none; border: none; width: 100%; text-align: left; font-size: 15px; font-weight: 600; font-family: inherit; }
@@ -104,11 +106,27 @@
     <button class="btn-sm" id="installBtn" onclick="installApp()" style="display:none;">Instalar app</button>
     <button class="installClose" onclick="dismissInstallBanner()">✕</button>
   </div>
-  <div class="brand"><span class="brand-icon">🛵</span>MotoYaTekax</div>
+  <div class="brand"><span class="brand-icon">🛵</span>MotoYa<span id="cityLabel"> Tekax</span></div>
   <div style="color:var(--text-dim);">Ingresa tu PIN de chofer</div>
   <input id="pinInput" inputmode="numeric" maxlength="6" placeholder="••••" />
   <button class="btn" onclick="login()">Entrar</button>
   <div id="loginError"></div>
+  <button class="btn-sm" onclick="location.href='quiero-ser-chofer.html'" style="margin-top:4px;">🆕 Quiero ser chofer</button>
+  <button class="btn-sm" onclick="location.href='index.html'" style="margin-top:4px;">🧍 Modo Pasajero</button>
+  <svg class="maya-motif" width="130" height="91" viewBox="0 0 200 140" fill="none" style="flex-shrink:0;margin-top:6px;">
+    <rect x="20" y="110" width="160" height="20" stroke="var(--accent)" stroke-width="1.6" opacity="0.8"/>
+    <rect x="35" y="90" width="130" height="20" stroke="var(--accent)" stroke-width="1.6" opacity="0.8"/>
+    <rect x="50" y="70" width="100" height="20" stroke="var(--accent)" stroke-width="1.6" opacity="0.8"/>
+    <rect x="65" y="50" width="70" height="20" stroke="var(--accent)" stroke-width="1.6" opacity="0.8"/>
+    <rect x="82" y="28" width="36" height="22" stroke="var(--accent)" stroke-width="1.6" opacity="0.8"/>
+    <rect x="95" y="36" width="10" height="14" stroke="var(--accent)" stroke-width="1.4" opacity="0.8"/>
+    <line x1="92" y1="50" x2="92" y2="130" stroke="var(--accent)" stroke-width="1.4" opacity="0.8"/>
+    <line x1="108" y1="50" x2="108" y2="130" stroke="var(--accent)" stroke-width="1.4" opacity="0.8"/>
+    <line x1="92" y1="65" x2="108" y2="65" stroke="var(--accent)" stroke-width="1.2" opacity="0.8"/>
+    <line x1="92" y1="85" x2="108" y2="85" stroke="var(--accent)" stroke-width="1.2" opacity="0.8"/>
+    <line x1="92" y1="105" x2="108" y2="105" stroke="var(--accent)" stroke-width="1.2" opacity="0.8"/>
+    <line x1="10" y1="130" x2="190" y2="130" stroke="var(--accent)" stroke-width="1.6" opacity="0.8"/>
+  </svg>
   <div class="credit" style="position:absolute;bottom:18px;">⚡ Tecnología de <strong>Lealtad Digital</strong> · <a href="aviso-legal.html" target="_blank" rel="noopener">Aviso legal</a></div>
 </div>
 
@@ -126,14 +144,19 @@
         <span>Disponible</span>
         <div id="switch" onclick="toggleAvailable()"><div class="knob"></div></div>
       </div>
-      <button id="profileAvatarBtn" onclick="openProfile()" title="Mi perfil">
-        <div class="circle">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f6a623" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M20 21a8 8 0 0 0-16 0"></path>
-            <circle cx="12" cy="8" r="4"></circle>
-          </svg>
-        </div>
-      </button>
+      <div style="display:flex;gap:8px;">
+        <button id="modePasajeroBtn" onclick="goPasajero()" title="Modo Pasajero">
+          <div class="circle">🧍</div>
+        </button>
+        <button id="profileAvatarBtn" onclick="openProfile()" title="Mi perfil">
+          <div class="circle">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#14110a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 21a8 8 0 0 0-16 0"></path>
+              <circle cx="12" cy="8" r="4"></circle>
+            </svg>
+          </div>
+        </button>
+      </div>
     </div>
   </div>
   <div id="map"></div>
@@ -243,6 +266,7 @@
 <script>
 const API = "";
 let deferredInstallPrompt = null;
+let resolvedCityLabel = "Tekax";
 fetch(API + "/api/config").then((r) => r.json()).then((cfg) => { SERVICE_FEE = cfg.serviceFee; }).catch(() => {});
 
 function isStandalone() {
@@ -258,7 +282,7 @@ function initInstallBanner() {
   const banner = document.getElementById("installBanner");
   const text = document.getElementById("installText");
   if (isIOS()) {
-    text.textContent = "📲 Instala MotoYaTekax Chofer: toca Compartir y luego \"Agregar a pantalla de inicio\".";
+    text.textContent = `📲 Instala MotoYa ${resolvedCityLabel} Chofer: toca Compartir y luego "Agregar a pantalla de inicio".`;
     banner.style.display = "flex";
   } else {
     window.addEventListener("beforeinstallprompt", (e) => {
@@ -285,6 +309,32 @@ function dismissInstallBanner() {
 }
 
 initInstallBanner();
+
+// Muestra la ciudad real de quien abre la app en vez de un nombre fijo — así
+// un chofer en Ticul ve "MotoYa Ticul" y no "MotoYaTekax". Si no hay GPS o la
+// ubicación cae fuera de la red, se queda con "Tekax" (valor por defecto en
+// el HTML) en vez de mostrar algo roto.
+function applyCityLabel(label) {
+  if (!label) return;
+  resolvedCityLabel = label;
+  document.querySelectorAll("#cityLabel").forEach((el) => (el.textContent = " " + label));
+  document.title = document.title.replace(/Tekax/, label);
+}
+
+function initCityBrand() {
+  if (!navigator.geolocation) return;
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      fetch(API + `/api/cities/resolve?lat=${pos.coords.latitude}&lng=${pos.coords.longitude}`)
+        .then((r) => r.json())
+        .then((data) => applyCityLabel(data.label))
+        .catch(() => {});
+    },
+    () => {},
+    { maximumAge: 300000, timeout: 5000 }
+  );
+}
+initCityBrand();
 
 let driver = null;
 let ws = null;
@@ -455,6 +505,15 @@ function logout() {
   releaseWakeLock();
   localStorage.removeItem("motoya_driver");
   location.reload();
+}
+
+function goPasajero() {
+  if (currentRide) {
+    showToast("No puedes salir de modo Chofer con un viaje activo");
+    return;
+  }
+  // Deja la sesión de chofer guardada: al volver a chofer.html, reentra sola.
+  location.href = "index.html";
 }
 
 function startApp() {
@@ -804,6 +863,12 @@ function renderRideList() {
   el.innerHTML = cards + moreHint;
 }
 
+// Qué tan cerca (en km) hace falta estar del punto para que se marque solo
+// — mismo umbral que ya usaba el botón para "resaltarse" (0.15 km = 150 m).
+const AUTO_ARRIVAL_KM = 0.15;
+let autoArriving = false;
+let autoCompleting = false;
+
 function updateDistances() {
   if (!myPos) return;
   if (currentRide) {
@@ -812,11 +877,24 @@ function updateDistances() {
       const el = document.getElementById("dist-current");
       if (el) el.textContent = dist.toFixed(1);
       const btn = document.getElementById("btnArrived");
-      if (btn) btn.classList.toggle("ready", dist <= 0.15);
+      if (btn) btn.classList.toggle("ready", dist <= AUTO_ARRIVAL_KM);
+      // Se le puede olvidar a cualquiera presionar el botón — si el GPS ya lo
+      // ubica en el punto, lo marcamos solos. El botón sigue ahí por si el
+      // GPS falla o el pin quedó en un lugar distinto al real.
+      if (dist <= AUTO_ARRIVAL_KM && !autoArriving) {
+        autoArriving = true;
+        arriveAtPickup()
+          .then((ok) => { if (ok) showToast("📍 Detectamos que llegaste — lo marcamos automático"); })
+          .finally(() => { autoArriving = false; });
+      }
     } else if (currentRide.status === "en_curso" && currentRide.dest_lat) {
       const dist = haversine(myPos.lat, myPos.lng, currentRide.dest_lat, currentRide.dest_lng);
       const el = document.getElementById("dist-current");
       if (el) el.textContent = dist.toFixed(1);
+      if (dist <= AUTO_ARRIVAL_KM && !autoCompleting) {
+        autoCompleting = true;
+        completeRide().finally(() => { autoCompleting = false; });
+      }
     }
     return;
   }
@@ -915,11 +993,12 @@ async function arriveAtPickup() {
   });
   if (!res.ok) {
     showToast((await res.json()).error || "No se pudo actualizar");
-    return;
+    return false;
   }
   currentRide.status = "llegue";
   updateRouteLine();
   renderRideList();
+  return true;
 }
 
 async function startTrip() {
@@ -945,7 +1024,7 @@ async function completeRide() {
   });
   if (!res.ok) {
     showToast((await res.json()).error || "No se pudo finalizar");
-    return;
+    return false;
   }
   const data = await res.json();
   todayCount = data.todayCount ?? todayCount + 1;
@@ -959,6 +1038,7 @@ async function completeRide() {
   renderRideList();
   refreshRankBadge();
   showDriverTierBadge(data.lifetimeTrips);
+  return true;
 }
 
 const RANK_EMOJI = { 1: "🥇", 2: "🥈", 3: "🥉" };

@@ -102,16 +102,18 @@
 <body>
 
 <div id="login" class="screen active">
-  <div class="brand"><span class="brand-icon">🛵</span>MotoYaTekax Admin</div>
+  <div class="brand"><span class="brand-icon">🛵</span>MotoYa Admin</div>
   <input id="adminPin" inputmode="numeric" placeholder="PIN de admin" />
   <button class="btn" onclick="login()">Entrar</button>
   <div id="err"></div>
 </div>
 
 <div id="app" class="screen">
+  <div id="adminCityBadge" style="text-align:center;padding:8px 0;color:var(--accent);font-weight:700;font-size:13.5px;">📍 Tekax</div>
   <div class="admin-tabs">
     <button id="tabBtn-resumen" class="active" onclick="switchTab('resumen')">📊 Resumen</button>
     <button id="tabBtn-choferes" onclick="switchTab('choferes')">👥 Choferes</button>
+    <button id="tabBtn-pasajeros" onclick="switchTab('pasajeros')">🧍 Pasajeros</button>
     <button id="tabBtn-viajes" onclick="switchTab('viajes')">🚗 Viajes</button>
     <button id="tabBtn-alertas" onclick="switchTab('alertas')">🚩 Alertas</button>
   </div>
@@ -161,17 +163,7 @@
 
   <div id="tabPanel-choferes" class="tab-panel">
   <h1>🔗 Link / QR de registro</h1>
-  <p class="section-hint">Elige a quién va dirigido este QR.</p>
-  <div class="tipo-tabs" id="qrModeTabs">
-    <button class="active" onclick="setQrMode('informal')">Independiente (general)</button>
-    <button onclick="setQrMode('generico')">Formal genérico</button>
-    <button onclick="setQrMode('gremio')">Gremio específico</button>
-  </div>
-  <p class="section-hint" id="qrModeHint"></p>
-  <div class="field" id="qrGrupoField" style="display:none;">
-    <label>Gremio</label>
-    <input id="qrGrupo" placeholder="Nombre del gremio" oninput="updateQrLink()" />
-  </div>
+  <p class="section-hint">Compártelo con quien quiera registrarse como chofer — cualquiera que se registre queda como independiente.</p>
   <div class="card" style="text-align:center; padding:18px;">
     <img id="qrImg" style="width:220px;height:220px;border-radius:8px;background:#fff;" />
     <div id="qrLinkText" style="word-break:break-all;font-size:12.5px;color:var(--text-dim);margin-top:12px;"></div>
@@ -211,6 +203,10 @@
     </select>
   </div>
   <div class="field">
+    <label>Ciudad</label>
+    <div id="driverCityDisplay" style="padding:10px 0;color:var(--accent);font-weight:700;">Tekax</div>
+  </div>
+  <div class="field">
     <label>Foto (opcional)</label>
     <input type="file" id="driverPhotoInput" accept="image/*" onchange="handleDriverPhoto(event)" />
   </div>
@@ -218,7 +214,7 @@
   <div class="field legalField">
     <label class="legalCheck">
       <input type="checkbox" id="driverAcceptedLegal" />
-      Le mostré y aceptó el <a href="aviso-legal.html" target="_blank" rel="noopener">Aviso Legal de MotoYaTekax</a>
+      Le mostré y aceptó el <a href="aviso-legal.html" target="_blank" rel="noopener">Aviso Legal de MotoYa</a>
     </label>
   </div>
   <button class="btn" onclick="registerDriver()">Registrar chofer</button>
@@ -240,9 +236,22 @@
   <div class="table-wrap">
     <table>
       <thead>
-        <tr><th>Nombre</th><th>PIN</th><th>Teléfono</th><th>Tipo</th><th>Servicio</th><th>Estado</th><th>Vehículo</th><th>Agrupación</th><th>Inscrito</th><th>Vigente hasta</th><th>Aval sindicato</th><th>Cancelaciones</th><th></th></tr>
+        <tr><th>Nombre</th><th>PIN</th><th>Teléfono</th><th>Tipo</th><th>Servicio</th><th>Ciudad</th><th>Estado</th><th>Vehículo</th><th>Agrupación</th><th>Inscrito</th><th>Vigente hasta</th><th>Aval sindicato</th><th>Cancelaciones</th><th></th></tr>
       </thead>
       <tbody id="driverRows"></tbody>
+    </table>
+  </div>
+  </div>
+
+  <div id="tabPanel-pasajeros" class="tab-panel">
+  <h1>🧍 Pasajeros registrados</h1>
+  <p class="section-hint">Cuentas reales con PIN — si alguien pierde acceso (cambió de celular, olvidó su PIN), restablécelo aquí y pásaselo por su cuenta.</p>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Nombre</th><th>Teléfono</th><th>PIN</th><th>Viajes completados</th><th>Registrado</th><th>Último viaje</th><th></th></tr>
+      </thead>
+      <tbody id="riderRows"></tbody>
     </table>
   </div>
   </div>
@@ -315,6 +324,8 @@ fetch(API + "/api/config").then((r) => r.json()).then((cfg) => {
 // null = prueba gratis indefinida, sin fecha de corte automática.
 let trialEndDateCache = null;
 let adminPin = null;
+let adminCity = "tekax";
+let adminCityLabel = "Tekax";
 let launchRankingCache = [];
 let driversCache = [];
 let applicationsCache = [];
@@ -327,7 +338,7 @@ let editingId = null;
 let ridesPollTimer = null;
 
 function switchTab(tab) {
-  ["resumen", "choferes", "viajes", "alertas"].forEach((t) => {
+  ["resumen", "choferes", "pasajeros", "viajes", "alertas"].forEach((t) => {
     document.getElementById(`tabPanel-${t}`).classList.toggle("active", t === tab);
     document.getElementById(`tabBtn-${t}`).classList.toggle("active", t === tab);
   });
@@ -371,33 +382,9 @@ function viewImage(dataUrl) {
     .catch(() => showToast("No se pudo abrir la imagen"));
 }
 
-let qrMode = "informal";
-
-const QR_MODE_HINTS = {
-  informal: "Cualquiera se registra sin gremio. Se le pide foto de placa como verificación.",
-  generico: "Sirve para cualquier gremio — el chofer escribe a cuál pertenece, pero como aún no lo avala su líder, también se le pide foto de placa.",
-  gremio: "Link fijo para un líder específico. Su gente entra ya marcada como formal de ese gremio y no se le pide foto de placa.",
-};
-
-function setQrMode(mode) {
-  qrMode = mode;
-  const modes = ["informal", "generico", "gremio"];
-  document.querySelectorAll("#qrModeTabs button").forEach((b, i) => {
-    b.classList.toggle("active", modes[i] === mode);
-  });
-  document.getElementById("qrGrupoField").style.display = mode === "gremio" ? "flex" : "none";
-  document.getElementById("qrModeHint").textContent = QR_MODE_HINTS[mode];
-  updateQrLink();
-}
 
 function updateQrLink() {
-  let link = `${location.origin}/quiero-ser-chofer.html`;
-  if (qrMode === "gremio") {
-    const grupo = document.getElementById("qrGrupo").value.trim();
-    link += grupo ? `?grupo=${encodeURIComponent(grupo)}` : "";
-  } else if (qrMode === "generico") {
-    link += "?formal=1";
-  }
+  const link = `${location.origin}/quiero-ser-chofer.html`;
   document.getElementById("qrLinkText").textContent = link;
   document.getElementById("qrImg").src = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(link)}`;
 }
@@ -414,7 +401,7 @@ function waLink(phone, text) {
 
 function welcomeMessage(driver) {
   const link = `${location.origin}/chofer.html`;
-  return `¡Hola ${driver.name}! Gracias por tu confianza en MotoYaTekax.\n\nTu PIN de acceso de chofer es: ${driver.pin}\nEntra aquí para empezar a recibir viajes: ${link}`;
+  return `¡Hola ${driver.name}! Gracias por tu confianza en MotoYa ${adminCityLabel}.\n\nTu PIN de acceso de chofer es: ${driver.pin}\nEntra aquí para empezar a recibir viajes: ${link}`;
 }
 
 function sendLastWhatsapp() {
@@ -440,17 +427,26 @@ async function login() {
     document.getElementById("err").textContent = "PIN incorrecto";
     return;
   }
+  const loginData = await res.json();
+  adminCity = loginData.city || "tekax";
+  adminCityLabel = loginData.cityLabel || "Tekax";
+  document.title = document.title.replace(/Tekax /, adminCityLabel + " ");
+  const cityBadge = document.getElementById("adminCityBadge");
+  if (cityBadge) cityBadge.textContent = "📍 " + adminCityLabel;
+  const cityField = document.getElementById("driverCityDisplay");
+  if (cityField) cityField.textContent = adminCityLabel;
   document.getElementById("login").classList.remove("active");
   document.getElementById("app").classList.add("active");
   let savedTab = "resumen";
   try { savedTab = localStorage.getItem("motoyaAdminTab") || "resumen"; } catch {}
   switchTab(savedTab);
   loadDrivers();
+  loadRiders();
   loadRides();
   loadStats();
   loadApplications();
   loadAlertas();
-  setQrMode("informal");
+  updateQrLink();
   clearInterval(ridesPollTimer);
   ridesPollTimer = setInterval(() => { loadRides(); loadStats(); loadApplications(); }, 4000);
 }
@@ -516,6 +512,7 @@ function renderApplications(apps) {
           <div class="who">
             <span class="name">${a.name}</span>
             <span class="meta">${a.phone} · ${timeAgo(a.created_at)} · ${vehicleTypeBadge(a.vehicle_type)} ${tipoBadge(a.tipo)}</span>
+            <span class="meta">📍 ${a.city ? cityLabel(a.city) : "ciudad no detectada"}</span>
             ${a.grupo ? `<span class="meta">🤝 ${a.grupo}</span>` : ""}
           </div>
         </div>
@@ -686,6 +683,48 @@ async function loadDrivers() {
   renderDriverRows();
 }
 
+let ridersCache = [];
+
+async function loadRiders() {
+  const res = await fetch(API + "/api/admin/riders/list", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ adminPin }),
+  });
+  ridersCache = await res.json();
+  renderRiderRows();
+}
+
+function renderRiderRows() {
+  document.getElementById("riderRows").innerHTML = ridersCache.map((r) => `
+    <tr>
+      <td>${r.name || "—"}</td>
+      <td>${r.phone}</td>
+      <td>${r.pin || "—"}</td>
+      <td>${r.trips}</td>
+      <td>${r.created_at ? r.created_at.slice(0, 10) : ""}</td>
+      <td>${r.last_ride_at ? r.last_ride_at.slice(0, 10) : "—"}</td>
+      <td><button class="btn-sm" onclick="resetRiderPin(${r.id})">Restablecer PIN</button></td>
+    </tr>`).join("") || `<tr><td colspan="7" class="ago">Todavía no hay pasajeros registrados.</td></tr>`;
+}
+
+async function resetRiderPin(id) {
+  const rider = ridersCache.find((r) => r.id === id);
+  if (!confirm(`¿Restablecer el PIN de ${rider.name || rider.phone}? El PIN anterior deja de funcionar.`)) return;
+  const res = await fetch(API + `/api/admin/riders/${id}/reset-pin`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ adminPin }),
+  });
+  if (!res.ok) {
+    showToast("No se pudo restablecer el PIN");
+    return;
+  }
+  const { pin } = await res.json();
+  alert(`Nuevo PIN de ${rider.name || rider.phone}: ${pin}\n\nApúntalo antes de cerrar esto — no se vuelve a mostrar.`);
+  loadRiders();
+}
+
 function startEdit(id) {
   editingId = id;
   renderDriverRows();
@@ -731,6 +770,23 @@ async function deleteDriver(id, name) {
     showToast((await res.json()).error || "No se pudo eliminar");
     return;
   }
+  loadDrivers();
+}
+
+async function resetDriverPin(id) {
+  const driver = driversCache.find((d) => d.id === id);
+  if (!confirm(`¿Restablecer el PIN de ${driver.name}? Su PIN anterior deja de funcionar de inmediato — necesita el nuevo para volver a entrar.`)) return;
+  const res = await fetch(API + `/api/admin/drivers/${id}/reset-pin`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ adminPin }),
+  });
+  if (!res.ok) {
+    showToast((await res.json()).error || "No se pudo restablecer el PIN");
+    return;
+  }
+  const { pin } = await res.json();
+  alert(`Nuevo PIN de ${driver.name}: ${pin}\n\nApúntalo antes de cerrar esto — no se vuelve a mostrar.`);
   loadDrivers();
 }
 
@@ -780,6 +836,11 @@ function vehicleTypeSelect(id, vehicleType) {
     </select>`;
 }
 
+function cityLabel(city) {
+  return city === "ticul" ? "Ticul" : "Tekax";
+}
+
+
 function renderDriverRows() {
   const rows = tipoFilter === "todos"
     ? driversCache
@@ -799,6 +860,7 @@ function renderDriverRows() {
         </td>
         <td>${tipoSelect(d.id, d.tipo)}</td>
         <td>${vehicleTypeSelect(d.id, d.vehicle_type)}</td>
+        <td>${cityLabel(d.city)}</td>
         <td><span class="dot ${d.status}"></span>${d.status}</td>
         <td><input id="edit-vehicle-${d.id}" value="${d.vehicle || ""}" placeholder="Vehículo" /></td>
         <td><input id="edit-grupo-${d.id}" value="${d.grupo || ""}" placeholder="Agrupación" /></td>
@@ -844,6 +906,7 @@ function renderDriverRows() {
       <td>${d.phone}</td>
       <td>${tipoBadge(d.tipo)}</td>
       <td>${vehicleTypeBadge(d.vehicle_type)}</td>
+      <td>${cityLabel(d.city)}</td>
       <td><span class="dot ${d.status}"></span>${d.status}</td>
       <td>${d.vehicle || "—"}</td>
       <td>${d.grupo || "—"}</td>
@@ -877,6 +940,7 @@ function renderDriverRows() {
       <td class="row-actions">
         <button class="btn-sm wa" onclick="sendWhatsappFor(${d.id})">WhatsApp</button>
         <button class="btn-sm" onclick="startEdit(${d.id})">Editar</button>
+        <button class="btn-sm" onclick="resetDriverPin(${d.id})">Restablecer PIN</button>
         <button class="btn-sm danger" onclick="deleteDriver(${d.id}, '${d.name.replace(/'/g, "\\'")}')">Eliminar</button>
       </td>
     </tr>`;
@@ -974,7 +1038,7 @@ function paymentReminderMessage(d) {
   const totalLine = total > 0 ? `\nTotal a pagar: $${total} MXN\n` : "";
   const leaderName = d.vouched_by || "tu líder de gremio";
 
-  return `¡Hola ${d.name}! 🛵💛 Gracias por ser parte del equipo MotoYaTekax, se nota tu esfuerzo.\n\n${lines.join("\n")}\n${rankingNote}${totalLine}\nEntrégaselo a ${leaderName} como de costumbre.\n\n¡Sigue así! 🙌`;
+  return `¡Hola ${d.name}! 🛵💛 Gracias por ser parte del equipo MotoYa ${adminCityLabel}, se nota tu esfuerzo.\n\n${lines.join("\n")}\n${rankingNote}${totalLine}\nEntrégaselo a ${leaderName} como de costumbre.\n\n¡Sigue así! 🙌`;
 }
 
 function sendPaymentReminder(id) {
