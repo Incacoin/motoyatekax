@@ -89,7 +89,9 @@ router.post("/riders/login", (req, res) => {
   }
   const { phone, pin } = req.body;
   const rider = db
-    .prepare("SELECT id, name, phone, pin FROM riders WHERE phone = ? AND pin = ?")
+    .prepare(
+      "SELECT id, name, phone, pin, photo, home_lat, home_lng, home_label FROM riders WHERE phone = ? AND pin = ?"
+    )
     .get(phone, pin);
 
   if (!rider) {
@@ -98,6 +100,67 @@ router.post("/riders/login", (req, res) => {
   }
   clearAttempts(req.ip);
   res.json(rider);
+});
+
+// La foto es lo único que el pasajero puede cambiar de su propio perfil, igual
+// que con el chofer (ver routes/drivers.js) — mismo límite de tamaño y mismo
+// formato esperado (data URL ya recortada/comprimida por el navegador).
+router.post("/riders/:id/photo", (req, res) => {
+  if (isRateLimited(req.ip)) {
+    return res.status(429).json({ error: RATE_LIMIT_MESSAGE });
+  }
+  const { phone, pin, photo } = req.body;
+  const rider = db
+    .prepare("SELECT id FROM riders WHERE id = ? AND phone = ? AND pin = ?")
+    .get(req.params.id, phone, pin);
+  if (!rider) {
+    recordFailedAttempt(req.ip);
+    return res.status(404).json({ error: "No autorizado" });
+  }
+  clearAttempts(req.ip);
+  if (typeof photo !== "string" || !/^data:image\/(jpeg|png|webp);base64,/.test(photo)) {
+    return res.status(400).json({ error: "Foto inválida" });
+  }
+  if (photo.length > 900000) {
+    return res.status(413).json({ error: "La foto pesa demasiado, intenta con otra" });
+  }
+
+  db.prepare("UPDATE riders SET photo = ? WHERE id = ?").run(photo, rider.id);
+  res.json({ ok: true });
+});
+
+// "Casa" del pasajero: un solo lugar guardado para no escribir la dirección
+// de cero en cada mandado/viaje repetido. clear:true la borra; si no, exige
+// lat/lng numéricos (el label es opcional, ej. "casa azul, portón negro").
+router.post("/riders/:id/home", (req, res) => {
+  if (isRateLimited(req.ip)) {
+    return res.status(429).json({ error: RATE_LIMIT_MESSAGE });
+  }
+  const { phone, pin, lat, lng, label, clear } = req.body;
+  const rider = db
+    .prepare("SELECT id FROM riders WHERE id = ? AND phone = ? AND pin = ?")
+    .get(req.params.id, phone, pin);
+  if (!rider) {
+    recordFailedAttempt(req.ip);
+    return res.status(404).json({ error: "No autorizado" });
+  }
+  clearAttempts(req.ip);
+
+  if (clear) {
+    db.prepare(
+      "UPDATE riders SET home_lat = NULL, home_lng = NULL, home_label = NULL WHERE id = ?"
+    ).run(rider.id);
+    return res.json({ ok: true });
+  }
+
+  if (typeof lat !== "number" || typeof lng !== "number") {
+    return res.status(400).json({ error: "Faltan coordenadas" });
+  }
+  const cleanLabel = typeof label === "string" ? label.trim().slice(0, 200) : null;
+  db.prepare(
+    "UPDATE riders SET home_lat = ?, home_lng = ?, home_label = ? WHERE id = ?"
+  ).run(lat, lng, cleanLabel || null, rider.id);
+  res.json({ ok: true, lat, lng, label: cleanLabel || null });
 });
 
 module.exports = router;

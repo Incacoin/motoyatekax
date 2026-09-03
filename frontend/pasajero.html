@@ -38,6 +38,9 @@
   .installBanner #installText { flex: 1; color: var(--text); line-height: 1.4; }
   .installClose { background: none; border: none; color: var(--text-faint); font-size: 15px; cursor: pointer; padding: 4px; flex-shrink: 0; }
   .btn:disabled { opacity: 0.4; }
+  .profile-photo-wrap { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  #profilePhoto { width: 96px; height: 96px; border-radius: 50%; object-fit: cover; border: 3px solid var(--accent); background: var(--bg-card); }
+  .profile-photo-fallback { width: 96px; height: 96px; border-radius: 50%; border: 3px dashed var(--border); display: flex; align-items: center; justify-content: center; font-size: 38px; background: var(--bg-card); }
   #mapScreen { position: relative; }
   #map { flex: 1; min-height: 0; }
   #accountBtn {
@@ -187,6 +190,12 @@
 
 <div id="profileScreen" class="screen" style="align-items:center;gap:14px;padding:24px;text-align:center;">
   <div class="brand" style="font-size:20px;">👤 Mi cuenta</div>
+  <div class="profile-photo-wrap">
+    <div id="profilePhotoSlot"></div>
+    <input type="file" id="profilePhotoInput" accept="image/*" capture="environment" style="display:none;" onchange="handleProfilePhoto(event)" />
+    <button class="btn-sm" id="profilePhotoBtn" onclick="document.getElementById('profilePhotoInput').click()">📷 Cambiar mi foto</button>
+    <div id="profilePhotoMsg" style="font-size:13px;min-height:16px;"></div>
+  </div>
   <div class="input-icon-row" style="width:260px;">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9a9fab" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21a8 8 0 0 0-16 0"></path><circle cx="12" cy="8" r="4"></circle></svg>
     <input id="profileNameInput" placeholder="Tu nombre" oninput="this.value = this.value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s'-]/g, '')" />
@@ -200,6 +209,16 @@
     <button class="btn-sm" onclick="togglePinVisibility()" style="padding:4px 10px;">Ver</button>
   </div>
   <button class="btn-sm" onclick="changeRiderPin()" style="width:260px;">Generar un PIN nuevo</button>
+
+  <div style="width:260px;box-sizing:border-box;display:flex;flex-direction:column;gap:8px;text-align:left;margin-top:6px;">
+    <span style="color:var(--text-dim);font-size:14px;">🏠 Mi casa</span>
+    <div id="homeSavedNote" style="display:none;font-size:13px;color:var(--text-dim);"></div>
+    <input id="homeLabelInput" placeholder="Referencia (ej. casa azul, portón negro)" />
+    <button class="btn-sm" onclick="saveHomeLocation()">📍 Guardar mi ubicación actual</button>
+    <button class="btn-sm" id="clearHomeBtn" style="display:none;color:var(--danger);border-color:rgba(229,72,77,0.35);" onclick="clearHomeLocation()">Quitar mi casa guardada</button>
+    <div id="homeMsg" style="font-size:13px;min-height:16px;"></div>
+  </div>
+
   <div id="profileError" style="color:var(--danger);font-size:13px;min-height:16px;"></div>
   <button class="btn" onclick="saveProfileName()" style="width:260px;">Guardar cambios</button>
   <button class="btn-sm" onclick="openHistory()" style="width:260px;">Mis viajes</button>
@@ -220,6 +239,7 @@
     <div class="hint" id="pickHint">Toca el mapa para marcar dónde te recogemos</div>
     <div class="row">
       <button class="btn btn-secondary" onclick="useMyLocation()">Usar mi ubicación</button>
+      <button class="btn btn-secondary" id="useHomeBtn" style="display:none;" onclick="useHomeLocation()">🏠 Mi casa</button>
       <button class="btn btn-secondary" onclick="resetPins()">Borrar pines</button>
     </div>
     <div class="row">
@@ -756,7 +776,10 @@ async function goToMap() {
     rider = await res.json();
   }
 
-  localStorage.setItem("motoya_rider", JSON.stringify({ id: rider.id, name: rider.name, phone: rider.phone, pin: rider.pin }));
+  localStorage.setItem("motoya_rider", JSON.stringify({
+    id: rider.id, name: rider.name, phone: rider.phone, pin: rider.pin, photo: rider.photo || null,
+    home_lat: rider.home_lat ?? null, home_lng: rider.home_lng ?? null, home_label: rider.home_label || null,
+  }));
 
   if (rider.isNewPin) {
     pendingNewRider = rider;
@@ -778,6 +801,7 @@ function enterMap() {
   document.getElementById("form").classList.remove("active");
   document.getElementById("pinScreen").classList.remove("active");
   document.getElementById("mapScreen").classList.add("active");
+  updateUseHomeBtn();
 
   map = L.map("map").setView([20.2098, -89.4620], 14); // Ticul aprox
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -1138,6 +1162,8 @@ function openProfile() {
   document.getElementById("profileScreen").classList.add("active");
   document.getElementById("profileNameInput").value = rider.name || "";
   document.getElementById("profilePhone").textContent = rider.phone || "";
+  renderProfilePhoto(rider.photo);
+  renderHomeStatus(rider);
   const pinEl = document.getElementById("profilePinValue");
   pinEl.textContent = "••••";
   pinEl.dataset.pin = rider.pin || "";
@@ -1150,6 +1176,161 @@ function openProfile() {
 function closeProfile() {
   document.getElementById("profileScreen").classList.remove("active");
   document.getElementById("mapScreen").classList.add("active");
+}
+
+function renderProfilePhoto(photo) {
+  const slot = document.getElementById("profilePhotoSlot");
+  slot.innerHTML = photo
+    ? `<img id="profilePhoto" src="${photo}" alt="Mi foto" />`
+    : `<div class="profile-photo-fallback"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#9aa1b0" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21a8 8 0 0 0-16 0"></path><circle cx="12" cy="8" r="4"></circle></svg></div>`;
+}
+
+function handleProfilePhoto(event) {
+  const file = event.target.files[0];
+  const msg = document.getElementById("profilePhotoMsg");
+  msg.style.color = "var(--danger)";
+  msg.textContent = "";
+  if (!file) return;
+
+  const img = new Image();
+  const reader = new FileReader();
+  reader.onload = (e) => { img.src = e.target.result; };
+  reader.onerror = () => { msg.textContent = "No se pudo leer la foto, intenta de nuevo"; };
+  img.onerror = () => { msg.textContent = "Ese archivo no es una imagen válida"; };
+  img.onload = () => {
+    let { width, height } = img;
+    const maxDim = 900;
+    if (width > height && width > maxDim) { height = Math.round(height * (maxDim / width)); width = maxDim; }
+    else if (height > maxDim) { width = Math.round(width * (maxDim / height)); height = maxDim; }
+
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+    uploadProfilePhoto(canvas.toDataURL("image/jpeg", 0.72));
+  };
+  reader.readAsDataURL(file);
+  event.target.value = ""; // permite volver a elegir la misma foto si algo falla
+}
+
+async function uploadProfilePhoto(dataUrl) {
+  const rider = JSON.parse(localStorage.getItem("motoya_rider") || "null");
+  if (!rider) return;
+  const msg = document.getElementById("profilePhotoMsg");
+  const btn = document.getElementById("profilePhotoBtn");
+  btn.disabled = true;
+  msg.style.color = "var(--text-dim)";
+  msg.textContent = "Guardando tu foto...";
+  try {
+    const res = await fetch(API + `/api/riders/${rider.id}/photo`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phone: rider.phone, pin: rider.pin, photo: dataUrl }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "No se pudo guardar");
+    localStorage.setItem("motoya_rider", JSON.stringify({ ...rider, photo: dataUrl }));
+    renderProfilePhoto(dataUrl);
+    msg.style.color = "var(--success)";
+    msg.textContent = "✅ Foto actualizada";
+  } catch (e) {
+    msg.style.color = "var(--danger)";
+    msg.textContent = e.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function renderHomeStatus(rider) {
+  const note = document.getElementById("homeSavedNote");
+  const clearBtn = document.getElementById("clearHomeBtn");
+  const labelInput = document.getElementById("homeLabelInput");
+  const hasHome = rider.home_lat != null && rider.home_lng != null;
+  note.style.display = hasHome ? "block" : "none";
+  note.textContent = hasHome ? `Guardada${rider.home_label ? ": " + rider.home_label : ""}` : "";
+  clearBtn.style.display = hasHome ? "block" : "none";
+  labelInput.value = rider.home_label || "";
+}
+
+function updateUseHomeBtn() {
+  const rider = JSON.parse(localStorage.getItem("motoya_rider") || "null");
+  const btn = document.getElementById("useHomeBtn");
+  btn.style.display = rider && rider.home_lat != null && rider.home_lng != null ? "block" : "none";
+}
+
+function saveHomeLocation() {
+  const rider = JSON.parse(localStorage.getItem("motoya_rider") || "null");
+  if (!rider) return;
+  if (!navigator.geolocation) return;
+  const msg = document.getElementById("homeMsg");
+  msg.style.color = "var(--text-dim)";
+  msg.textContent = "Buscando tu ubicación...";
+  navigator.geolocation.getCurrentPosition(async (pos) => {
+    const label = document.getElementById("homeLabelInput").value.trim();
+    msg.textContent = "Guardando...";
+    try {
+      const res = await fetch(API + `/api/riders/${rider.id}/home`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          phone: rider.phone, pin: rider.pin,
+          lat: pos.coords.latitude, lng: pos.coords.longitude, label,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "No se pudo guardar");
+      const updated = { ...rider, home_lat: data.lat, home_lng: data.lng, home_label: data.label };
+      localStorage.setItem("motoya_rider", JSON.stringify(updated));
+      renderHomeStatus(updated);
+      updateUseHomeBtn();
+      msg.style.color = "var(--success)";
+      msg.textContent = "✅ Casa guardada";
+    } catch (e) {
+      msg.style.color = "var(--danger)";
+      msg.textContent = e.message;
+    }
+  }, () => {
+    msg.style.color = "var(--danger)";
+    msg.textContent = "No se pudo obtener tu ubicación";
+  });
+}
+
+async function clearHomeLocation() {
+  const rider = JSON.parse(localStorage.getItem("motoya_rider") || "null");
+  if (!rider) return;
+  const msg = document.getElementById("homeMsg");
+  msg.style.color = "var(--text-dim)";
+  msg.textContent = "Quitando...";
+  try {
+    const res = await fetch(API + `/api/riders/${rider.id}/home`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phone: rider.phone, pin: rider.pin, clear: true }),
+    });
+    if (!res.ok) throw new Error((await res.json()).error || "No se pudo quitar");
+    const updated = { ...rider, home_lat: null, home_lng: null, home_label: null };
+    localStorage.setItem("motoya_rider", JSON.stringify(updated));
+    renderHomeStatus(updated);
+    updateUseHomeBtn();
+    msg.style.color = "var(--success)";
+    msg.textContent = "Casa quitada";
+  } catch (e) {
+    msg.style.color = "var(--danger)";
+    msg.textContent = e.message;
+  }
+}
+
+function useHomeLocation() {
+  const rider = JSON.parse(localStorage.getItem("motoya_rider") || "null");
+  if (!rider || rider.home_lat == null) return;
+  pickup = L.latLng(rider.home_lat, rider.home_lng);
+  if (pickupMarker) map.removeLayer(pickupMarker);
+  pickupMarker = L.marker(pickup, { icon: numberedIcon(1, "#f6a623") }).addTo(map).bindPopup("Recogida (mi casa)").openPopup();
+  map.setView(pickup, 16);
+  if (rider.home_label) document.getElementById("referenceInput").value = rider.home_label;
+  document.getElementById("pickHint").textContent = "Ahora toca el mapa para marcar tu destino (opcional)";
+  document.getElementById("requestBtn").disabled = false;
+  updateFareEstimate();
 }
 
 function togglePinVisibility() {

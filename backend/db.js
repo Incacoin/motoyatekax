@@ -342,4 +342,30 @@ try {
   // la columna ya existe
 }
 
+try {
+  db.exec("ALTER TABLE riders ADD COLUMN photo TEXT");
+} catch {
+  // la columna ya existe
+}
+
+// Un solo lugar guardado ("Casa") para no escribir la dirección de cero cada
+// vez que se pide un mandado o viaje repetido — no es una libreta de varios
+// lugares, solo el caso de uso más frecuente (ver conversación con el
+// usuario sobre mandados/medicinas a domicilio).
+try {
+  db.exec("ALTER TABLE riders ADD COLUMN home_lat REAL");
+} catch {
+  // la columna ya existe
+}
+try {
+  db.exec("ALTER TABLE riders ADD COLUMN home_lng REAL");
+} catch {
+  // la columna ya existe
+}
+try {
+  db.exec("ALTER TABLE riders ADD COLUMN home_label TEXT");
+} catch {
+  // la columna ya existe
+}
+
 module.exports = db;
