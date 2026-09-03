@@ -293,7 +293,7 @@ router.post("/admin/chofer-solicitudes/:id/dismiss", checkAdminPin, (req, res) =
 router.post("/admin/riders/list", checkAdminPin, (req, res) => {
   const riders = db
     .prepare(
-      `SELECT r.id, r.name, r.phone, r.pin, r.created_at, r.last_ride_at,
+      `SELECT r.id, r.name, r.phone, r.pin, r.created_at, r.last_ride_at, r.no_show_count,
               (SELECT COUNT(*) FROM rides WHERE rider_id = r.id AND status = 'completado') AS trips
        FROM riders r
        WHERE r.city = ?
@@ -439,7 +439,21 @@ router.post("/admin/reports/cancelaciones", checkAdminPin, (req, res) => {
     )
     .all(req.adminCity);
 
-  res.json({ porChofer, paresRepetidos });
+  // Pasajeros que ya acumularon varias veces "El pasajero no llegó" (ver
+  // no_show_count en riders/rides.js). No se bloquean solos — es para que el
+  // admin decida si contacta o restringe, porque un "no llegó" también puede
+  // ser el chofer equivocándose de ubicación.
+  const NO_SHOW_ALERT_THRESHOLD = 2;
+  const inasistencias = db
+    .prepare(
+      `SELECT id, name, phone, no_show_count
+       FROM riders
+       WHERE city = ? AND no_show_count >= ?
+       ORDER BY no_show_count DESC`
+    )
+    .all(req.adminCity, NO_SHOW_ALERT_THRESHOLD);
+
+  res.json({ porChofer, paresRepetidos, inasistencias });
 });
 
 module.exports = router;
