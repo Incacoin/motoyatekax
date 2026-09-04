@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
-<title>MotoYaTekax</title>
+<title>MotoYa</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%9B%BA%3C/text%3E%3C/svg%3E" />
 <link rel="manifest" href="manifest.json" />
 <meta name="theme-color" content="#f6a623" />
@@ -123,7 +123,7 @@
     <button class="btn-sm" id="installBtn" onclick="installApp()" style="display:none;">Instalar app</button>
     <button class="installClose" onclick="dismissInstallBanner()">✕</button>
   </div>
-  <div class="brand"><span class="brand-icon">🛵</span>MotoYa<span id="cityLabel"> Tekax</span></div>
+  <div class="brand"><span class="brand-icon">🛵</span>MotoYa<span id="cityLabel"></span></div>
   <div style="color:var(--text-dim);">Pide tu mototaxi</div>
   <div style="color:var(--text-dim); font-size:13px; margin-top:-4px;">Pasajes, delivery y mandados</div>
   <div class="input-icon-row">
@@ -344,7 +344,7 @@ function closePhotoLightbox() {
 
 const API = "";
 let deferredInstallPrompt = null;
-let resolvedCityLabel = "Tekax";
+let resolvedCityLabel = "";
 fetch(API + "/api/config").then((r) => r.json()).then((cfg) => { SERVICE_FEE = cfg.serviceFee; }).catch(() => {});
 
 function isStandalone() {
@@ -388,15 +388,15 @@ function dismissInstallBanner() {
 
 initInstallBanner();
 
-// Muestra la ciudad real de quien abre la app en vez de un nombre fijo — así
-// alguien en Ticul ve "MotoYa Ticul" y no "MotoYaTekax". Si no hay GPS o la
-// ubicación cae fuera de la red, se queda con "Tekax" (valor por defecto en
-// el HTML) en vez de mostrar algo roto.
+// Estado neutro por defecto ("MotoYa" sin pueblo) hasta que el GPS resuelve
+// la ciudad real de quien abre la app — así el link/QR compartido no queda
+// atado a un pueblo fijo, y cada quien ve el suyo (Tekax o Ticul) una vez
+// que la app confirma dónde está.
 function applyCityLabel(label) {
   if (!label) return;
   resolvedCityLabel = label;
   document.querySelectorAll("#cityLabel").forEach((el) => (el.textContent = " " + label));
-  document.title = document.title.replace(/Tekax/, label);
+  document.title = "MotoYa " + label;
 }
 
 function initCityBrand() {

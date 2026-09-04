@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
-<title>MotoYaTekax — Quiero ser chofer</title>
+<title>MotoYa — Quiero ser chofer</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%9B%BA%3C/text%3E%3C/svg%3E" />
 <link rel="stylesheet" href="style.css" />
 <style>
@@ -54,8 +54,8 @@
       <line x1="92" y1="105" x2="108" y2="105" stroke="var(--accent)" stroke-width="1.2" opacity="0.8"/>
       <line x1="10" y1="130" x2="190" y2="130" stroke="var(--accent)" stroke-width="1.6" opacity="0.8"/>
     </svg>
-    <p class="brand"><span class="brand-icon">🛵</span>MotoYa<span id="cityLabel"> Tekax</span></p>
-    <p class="lead">Regístrate como conductor y empieza a recibir viajes en <span id="cityLabelInline">Tekax</span>. Déjanos tu nombre y teléfono — te contactamos por WhatsApp para completar tu alta y darte tu PIN.</p>
+    <p class="brand"><span class="brand-icon">🛵</span>MotoYa<span id="cityLabel"></span></p>
+    <p class="lead">Regístrate como conductor y empieza a recibir viajes en <span id="cityLabelInline">tu zona</span>. Déjanos tu nombre y teléfono — te contactamos por WhatsApp para completar tu alta y darte tu PIN.</p>
 
     <div class="field">
       <label>Nombre completo</label>
@@ -125,14 +125,14 @@ let photoDataUrl = "";
 // le mostramos un selector para que la elija él mismo — así nunca cae por
 // default en la cola de la ciudad equivocada.
 let detectedCity = "";
-let resolvedCityLabel = "Tekax";
+let resolvedCityLabel = "";
 
 function applyCityFromDetection(city, label) {
   detectedCity = city;
   resolvedCityLabel = label;
   document.querySelectorAll("#cityLabel").forEach((el) => (el.textContent = " " + label));
   document.getElementById("cityLabelInline").textContent = label;
-  document.title = document.title.replace(/Tekax/, label);
+  document.title = "MotoYa " + label + " — Quiero ser chofer";
 }
 
 function showManualCityPicker() {
