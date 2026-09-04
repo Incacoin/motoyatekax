@@ -258,7 +258,7 @@
       <button class="btn btn-secondary" id="useHomeBtn" style="display:none;" onclick="useHomeLocation()">🏠 Mi casa</button>
       <button class="btn btn-secondary" onclick="resetPins()">Borrar pines</button>
     </div>
-    <div class="row">
+    <div class="row" id="passengerRow">
       <span style="color:var(--text-dim);font-size:14px;">Adultos</span>
       <div class="stepper">
         <button class="btn-sm" onclick="changePassengers(-1)">−</button>
@@ -266,7 +266,7 @@
         <button class="btn-sm" onclick="changePassengers(1)">+</button>
       </div>
     </div>
-    <div class="row">
+    <div class="row" id="childrenRow">
       <span style="color:var(--text-dim);font-size:14px;">Niños (3-9 años)</span>
       <div class="stepper">
         <button class="btn-sm" onclick="changeChildren(-1)">−</button>
@@ -581,11 +581,32 @@ function setServiceType(type) {
 
 // Solo cambia la etiqueta que ve el chofer (qué va a recoger), no el precio
 // — la tarifa sigue siendo la misma fórmula por distancia para los tres.
+const SERVICE_CATEGORY_REFERENCE_PLACEHOLDER = {
+  pasaje: "Referencia (ej. casa azul, portón negro)",
+  domicilio: "Qué se entrega y a nombre de quién (ej. 2 pollos rostizados, para Juan)",
+  mandado: "Qué necesita hacer el chofer (ej. recoger receta y medicina en la farmacia)",
+};
+
 function setServiceCategory(category) {
   serviceCategory = category;
   document.getElementById("catPasaje").classList.toggle("active", category === "pasaje");
   document.getElementById("catDomicilio").classList.toggle("active", category === "domicilio");
   document.getElementById("catMandado").classList.toggle("active", category === "mandado");
+
+  // Adultos/niños no aplican si nadie se va a subir (domicilio/mandado los
+  // pide un negocio o quien encarga la diligencia, no un pasajero).
+  const isPassengerTrip = category === "pasaje";
+  document.getElementById("passengerRow").style.display = isPassengerTrip ? "flex" : "none";
+  document.getElementById("childrenRow").style.display = isPassengerTrip ? "flex" : "none";
+  if (!isPassengerTrip) {
+    passengers = 1;
+    children = 0;
+    document.getElementById("passengerCount").textContent = "1";
+    document.getElementById("childrenCount").textContent = "0";
+  }
+
+  document.getElementById("referenceInput").placeholder = SERVICE_CATEGORY_REFERENCE_PLACEHOLDER[category];
+  updateFareEstimate();
 }
 
 function numberedIcon(num, color) {
