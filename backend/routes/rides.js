@@ -73,14 +73,11 @@ router.post("/rides", (req, res) => {
     .get(result.lastInsertRowid);
 
   // Viajes completados anteriores de este mismo teléfono — para mostrarle
-  // su propio contador/insignia de pasajero frecuente. Va pegado a la
-  // creación del viaje (no es un endpoint público aparte) para no dejar
-  // consultar el historial de cualquier número ajeno.
-  const { trips: riderTripCount } = db
-    .prepare(
-      "SELECT COUNT(*) AS trips FROM rides WHERE rider_phone = ? AND status = 'completado'"
-    )
-    .get(rider_phone);
+  // su propio contador/insignia de pasajero frecuente, y (pegado al objeto
+  // `ride`) para que el chofer también lo vea en la solicitud entrante y,
+  // más abajo en /accept, en el viaje activo.
+  const riderTripCount = riderTripCountFor(rider_phone);
+  ride.riderTripCount = riderTripCount;
 
   realtime.broadcastNewRide(ride);
   realtime.startNoDriverTimer(ride.id);
@@ -126,8 +123,20 @@ router.get("/rides/:id", (req, res) => {
       )
       .get(ride.driver_id);
   }
+  ride.riderTripCount = riderTripCountFor(ride.rider_phone);
   res.json(ride);
 });
+
+// Cuántos viajes completados lleva este teléfono — mismo cálculo que ya
+// se usaba solo para el pasajero (ver POST /rides), ahora también para
+// que el chofer vea con quién está tratando antes/durante el viaje.
+function riderTripCountFor(phone) {
+  if (!phone) return null;
+  const { trips } = db
+    .prepare("SELECT COUNT(*) AS trips FROM rides WHERE rider_phone = ? AND status = 'completado'")
+    .get(phone);
+  return trips;
+}
 
 router.post("/rides/:id/accept", (req, res) => {
   const rideId = Number(req.params.id);
@@ -151,6 +160,7 @@ router.post("/rides/:id/accept", (req, res) => {
   realtime.clearPreAcceptContact(rideId);
 
   const ride = db.prepare("SELECT * FROM rides WHERE id = ?").get(rideId);
+  ride.riderTripCount = riderTripCountFor(ride.rider_phone);
   const driver = db
     .prepare(
       "SELECT id, name, phone, vehicle, grupo, lat, lng, photo FROM drivers WHERE id = ?"

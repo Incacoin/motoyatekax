@@ -779,6 +779,14 @@ function removePendingRide(id) {
 
 let renderedShape = null;
 
+// Cuántos viajes completados lleva el pasajero — mismo dato que ya se
+// calculaba para su propia insignia (ver pasajero.html), ahora expuesto
+// también al chofer para que sepa con quién está tratando.
+function riderTripText(r) {
+  if (r.riderTripCount == null) return "";
+  return r.riderTripCount > 0 ? ` · ${r.riderTripCount} viaje${r.riderTripCount === 1 ? "" : "s"}` : " · Pasajero nuevo";
+}
+
 function renderRideList() {
   const el = document.getElementById("rideList");
 
@@ -797,7 +805,7 @@ function renderRideList() {
       el.innerHTML = `
         <div class="card ride-card active fade-in">
           <div class="label">Yendo a recoger</div>
-          <div class="meta">Pasajero: ${currentRide.rider_name} · ${currentRide.rider_phone}</div>
+          <div class="meta">Pasajero: ${currentRide.rider_name} · ${currentRide.rider_phone}${riderTripText(currentRide)}</div>
           <div class="meta">Recogida: ${currentRide.pickup_label || "punto marcado en el mapa"} (<span id="dist-current">${dist}</span> km · <span id="eta-current"></span>)</div>
           ${destLine}
           ${fareLine}
@@ -808,7 +816,7 @@ function renderRideList() {
       el.innerHTML = `
         <div class="card ride-card active fade-in">
           <div class="label">Esperando al pasajero</div>
-          <div class="meta">Pasajero: ${currentRide.rider_name} · ${currentRide.rider_phone}</div>
+          <div class="meta">Pasajero: ${currentRide.rider_name} · ${currentRide.rider_phone}${riderTripText(currentRide)}</div>
           <div class="meta">Recogida: ${currentRide.pickup_label || "punto marcado en el mapa"}</div>
           ${destLine}
           ${fareLine}
@@ -820,7 +828,7 @@ function renderRideList() {
       el.innerHTML = `
         <div class="card ride-card active fade-in">
           <div class="label">Viaje en curso</div>
-          <div class="meta">Pasajero: ${currentRide.rider_name} · ${currentRide.rider_phone}</div>
+          <div class="meta">Pasajero: ${currentRide.rider_name} · ${currentRide.rider_phone}${riderTripText(currentRide)}</div>
           ${currentRide.dest_lat
             ? `<div class="meta">Destino: ${currentRide.dest_label || "punto marcado en el mapa"} (<span id="dist-current">${dist}</span> km · <span id="eta-current"></span>)</div>`
             : `<div class="meta">Sin destino marcado</div>`}
@@ -846,7 +854,7 @@ function renderRideList() {
     const color = colorForPendingRide(r.id);
     return `
       <div class="card ride-card pending fade-in">
-        <div class="label"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${color};margin-right:7px;"></span>${r.rider_name}</div>
+        <div class="label"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${color};margin-right:7px;"></span>${r.rider_name}${riderTripText(r)}</div>
         <div class="meta">Recogida a <span id="dist-${r.id}">${dist}</span> km${r.pickup_label ? " · " + r.pickup_label : ""}</div>
         ${r.dest_lat ? `<div class="meta">Destino: ${r.dest_label || "punto marcado en el mapa"} (${haversine(r.pickup_lat, r.pickup_lng, r.dest_lat, r.dest_lng).toFixed(1)} km desde la recogida)</div>` : ""}
         <div class="meta fare">${estimateFare(r)}</div>
