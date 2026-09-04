@@ -19,7 +19,10 @@ router.post("/rides", (req, res) => {
     passengers,
     children,
     ride_type,
+    service_kind,
   } = req.body;
+  const VALID_SERVICE_KINDS = ["pasaje", "domicilio", "mandado"];
+  const cleanServiceKind = VALID_SERVICE_KINDS.includes(service_kind) ? service_kind : "pasaje";
 
   if (!rider_phone || !rider_pin || pickup_lat == null || pickup_lng == null) {
     return res.status(400).json({ error: "Faltan datos del viaje" });
@@ -49,8 +52,8 @@ router.post("/rides", (req, res) => {
 
   const result = db
     .prepare(
-      `INSERT INTO rides (rider_name, rider_phone, rider_id, pickup_lat, pickup_lng, pickup_label, dest_lat, dest_lng, dest_label, passengers, children, ride_type, city)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO rides (rider_name, rider_phone, rider_id, pickup_lat, pickup_lng, pickup_label, dest_lat, dest_lng, dest_label, passengers, children, ride_type, city, service_kind)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       rider_name,
@@ -65,23 +68,24 @@ router.post("/rides", (req, res) => {
       passengers || 1,
       children || 0,
       ride_type === "taxi" ? "taxi" : "moto",
-      city
+      city,
+      cleanServiceKind
     );
 
   const ride = db
     .prepare("SELECT * FROM rides WHERE id = ?")
     .get(result.lastInsertRowid);
 
-  // Viajes completados anteriores de este mismo teléfono — para mostrarle
-  // su propio contador/insignia de pasajero frecuente, y (pegado al objeto
+  // Viajes completados anteriores de este mismo teléfono y su foto — para
+  // mostrarle al pasajero su propio contador/insignia, y (pegado al objeto
   // `ride`) para que el chofer también lo vea en la solicitud entrante y,
   // más abajo en /accept, en el viaje activo.
-  const riderTripCount = riderTripCountFor(rider_phone);
-  ride.riderTripCount = riderTripCount;
+  const riderInfo = riderInfoFor(rider_phone);
+  Object.assign(ride, riderInfo);
 
   realtime.broadcastNewRide(ride);
   realtime.startNoDriverTimer(ride.id);
-  res.status(201).json({ ...ride, riderTripCount });
+  res.status(201).json({ ...ride, riderTripCount: riderInfo.riderTripCount });
 });
 
 // Si un pasajero o chofer se quedó a medias (app cerrada, celular apagado,
@@ -123,19 +127,21 @@ router.get("/rides/:id", (req, res) => {
       )
       .get(ride.driver_id);
   }
-  ride.riderTripCount = riderTripCountFor(ride.rider_phone);
+  Object.assign(ride, riderInfoFor(ride.rider_phone));
   res.json(ride);
 });
 
-// Cuántos viajes completados lleva este teléfono — mismo cálculo que ya
-// se usaba solo para el pasajero (ver POST /rides), ahora también para
-// que el chofer vea con quién está tratando antes/durante el viaje.
-function riderTripCountFor(phone) {
-  if (!phone) return null;
+// Cuántos viajes completados lleva este teléfono y su foto de perfil — antes
+// solo se calculaba el conteo para el pasajero (ver POST /rides), ahora
+// también para que el chofer vea con quién está tratando antes/durante el
+// viaje (solicitud entrante y viaje activo).
+function riderInfoFor(phone) {
+  if (!phone) return { riderTripCount: null, riderPhoto: null };
   const { trips } = db
     .prepare("SELECT COUNT(*) AS trips FROM rides WHERE rider_phone = ? AND status = 'completado'")
     .get(phone);
-  return trips;
+  const riderRow = db.prepare("SELECT photo FROM riders WHERE phone = ?").get(phone);
+  return { riderTripCount: trips, riderPhoto: riderRow ? riderRow.photo : null };
 }
 
 router.post("/rides/:id/accept", (req, res) => {
@@ -160,7 +166,7 @@ router.post("/rides/:id/accept", (req, res) => {
   realtime.clearPreAcceptContact(rideId);
 
   const ride = db.prepare("SELECT * FROM rides WHERE id = ?").get(rideId);
-  ride.riderTripCount = riderTripCountFor(ride.rider_phone);
+  Object.assign(ride, riderInfoFor(ride.rider_phone));
   const driver = db
     .prepare(
       "SELECT id, name, phone, vehicle, grupo, lat, lng, photo FROM drivers WHERE id = ?"

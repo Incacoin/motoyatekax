@@ -787,6 +787,23 @@ function riderTripText(r) {
   return r.riderTripCount > 0 ? ` · ${r.riderTripCount} viaje${r.riderTripCount === 1 ? "" : "s"}` : " · Pasajero nuevo";
 }
 
+// Foto del pasajero, igual que ya se ve la del chofer en pasajero.html —
+// círculo chico con imagen si hay, o un círculo vacío si no.
+function riderAvatarHtml(photo) {
+  return photo
+    ? `<img src="${photo}" alt="" style="width:28px;height:28px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:6px;" />`
+    : `<span style="display:inline-block;width:28px;height:28px;border-radius:50%;background:var(--bg-card);border:1px solid var(--border);vertical-align:middle;margin-right:6px;"></span>`;
+}
+
+// Qué es el viaje (mismo precio para los tres, ver riders.js) — sin
+// etiqueta para "pasaje" porque es el caso más común, no hay que
+// recargarle texto a la tarjeta por algo que ya se asume por default.
+const SERVICE_KIND_LABEL = { domicilio: "🍲 Domicilio", mandado: "📦 Mandado" };
+function serviceKindPrefix(r) {
+  const label = SERVICE_KIND_LABEL[r.service_kind];
+  return label ? `${label} · ` : "";
+}
+
 function renderRideList() {
   const el = document.getElementById("rideList");
 
@@ -805,7 +822,7 @@ function renderRideList() {
       el.innerHTML = `
         <div class="card ride-card active fade-in">
           <div class="label">Yendo a recoger</div>
-          <div class="meta">Pasajero: ${currentRide.rider_name} · ${currentRide.rider_phone}${riderTripText(currentRide)}</div>
+          <div class="meta">${riderAvatarHtml(currentRide.riderPhoto)}${serviceKindPrefix(currentRide)}Pasajero: ${currentRide.rider_name} · ${currentRide.rider_phone}${riderTripText(currentRide)}</div>
           <div class="meta">Recogida: ${currentRide.pickup_label || "punto marcado en el mapa"} (<span id="dist-current">${dist}</span> km · <span id="eta-current"></span>)</div>
           ${destLine}
           ${fareLine}
@@ -816,7 +833,7 @@ function renderRideList() {
       el.innerHTML = `
         <div class="card ride-card active fade-in">
           <div class="label">Esperando al pasajero</div>
-          <div class="meta">Pasajero: ${currentRide.rider_name} · ${currentRide.rider_phone}${riderTripText(currentRide)}</div>
+          <div class="meta">${riderAvatarHtml(currentRide.riderPhoto)}${serviceKindPrefix(currentRide)}Pasajero: ${currentRide.rider_name} · ${currentRide.rider_phone}${riderTripText(currentRide)}</div>
           <div class="meta">Recogida: ${currentRide.pickup_label || "punto marcado en el mapa"}</div>
           ${destLine}
           ${fareLine}
@@ -828,7 +845,7 @@ function renderRideList() {
       el.innerHTML = `
         <div class="card ride-card active fade-in">
           <div class="label">Viaje en curso</div>
-          <div class="meta">Pasajero: ${currentRide.rider_name} · ${currentRide.rider_phone}${riderTripText(currentRide)}</div>
+          <div class="meta">${riderAvatarHtml(currentRide.riderPhoto)}${serviceKindPrefix(currentRide)}Pasajero: ${currentRide.rider_name} · ${currentRide.rider_phone}${riderTripText(currentRide)}</div>
           ${currentRide.dest_lat
             ? `<div class="meta">Destino: ${currentRide.dest_label || "punto marcado en el mapa"} (<span id="dist-current">${dist}</span> km · <span id="eta-current"></span>)</div>`
             : `<div class="meta">Sin destino marcado</div>`}
@@ -854,7 +871,7 @@ function renderRideList() {
     const color = colorForPendingRide(r.id);
     return `
       <div class="card ride-card pending fade-in">
-        <div class="label"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${color};margin-right:7px;"></span>${r.rider_name}${riderTripText(r)}</div>
+        <div class="label">${riderAvatarHtml(r.riderPhoto)}<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${color};margin-right:7px;"></span>${serviceKindPrefix(r)}${r.rider_name}${riderTripText(r)}</div>
         <div class="meta">Recogida a <span id="dist-${r.id}">${dist}</span> km${r.pickup_label ? " · " + r.pickup_label : ""}</div>
         ${r.dest_lat ? `<div class="meta">Destino: ${r.dest_label || "punto marcado en el mapa"} (${haversine(r.pickup_lat, r.pickup_lng, r.dest_lat, r.dest_lng).toFixed(1)} km desde la recogida)</div>` : ""}
         <div class="meta fare">${estimateFare(r)}</div>

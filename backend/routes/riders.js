@@ -90,7 +90,7 @@ router.post("/riders/login", (req, res) => {
   const { phone, pin } = req.body;
   const rider = db
     .prepare(
-      "SELECT id, name, phone, pin, photo, home_lat, home_lng, home_label FROM riders WHERE phone = ? AND pin = ?"
+      "SELECT id, name, phone, pin, photo, home_lat, home_lng, home_label, emergency_contact_name, emergency_contact_phone FROM riders WHERE phone = ? AND pin = ?"
     )
     .get(phone, pin);
 
@@ -161,6 +161,41 @@ router.post("/riders/:id/home", (req, res) => {
     "UPDATE riders SET home_lat = ?, home_lng = ?, home_label = ? WHERE id = ?"
   ).run(lat, lng, cleanLabel || null, rider.id);
   res.json({ ok: true, lat, lng, label: cleanLabel || null });
+});
+
+// Contacto de emergencia: un solo número guardado para el botón "Avisar" del
+// viaje activo. clear:true lo borra; si no, exige un teléfono con al menos
+// 8 dígitos (el nombre es opcional, solo para personalizar el mensaje).
+router.post("/riders/:id/emergency-contact", (req, res) => {
+  if (isRateLimited(req.ip)) {
+    return res.status(429).json({ error: RATE_LIMIT_MESSAGE });
+  }
+  const { phone, pin, name, contactPhone, clear } = req.body;
+  const rider = db
+    .prepare("SELECT id FROM riders WHERE id = ? AND phone = ? AND pin = ?")
+    .get(req.params.id, phone, pin);
+  if (!rider) {
+    recordFailedAttempt(req.ip);
+    return res.status(404).json({ error: "No autorizado" });
+  }
+  clearAttempts(req.ip);
+
+  if (clear) {
+    db.prepare(
+      "UPDATE riders SET emergency_contact_name = NULL, emergency_contact_phone = NULL WHERE id = ?"
+    ).run(rider.id);
+    return res.json({ ok: true });
+  }
+
+  const digits = typeof contactPhone === "string" ? contactPhone.replace(/\D/g, "") : "";
+  if (digits.length < 8 || digits.length > 15) {
+    return res.status(400).json({ error: "Escribe un teléfono válido" });
+  }
+  const cleanName = typeof name === "string" ? name.trim().slice(0, 100) : null;
+  db.prepare(
+    "UPDATE riders SET emergency_contact_name = ?, emergency_contact_phone = ? WHERE id = ?"
+  ).run(cleanName || null, digits, rider.id);
+  res.json({ ok: true, name: cleanName || null, contactPhone: digits });
 });
 
 module.exports = router;

@@ -220,6 +220,16 @@
     <div id="homeMsg" style="font-size:13px;min-height:16px;"></div>
   </div>
 
+  <div style="width:260px;box-sizing:border-box;display:flex;flex-direction:column;gap:8px;text-align:left;margin-top:6px;">
+    <span style="color:var(--text-dim);font-size:14px;">🚨 Contacto de emergencia</span>
+    <div id="emergencyContactNote" style="display:none;font-size:13px;color:var(--text-dim);"></div>
+    <input id="emergencyNameInput" placeholder="Nombre (opcional)" />
+    <input id="emergencyPhoneInput" placeholder="Teléfono (10 dígitos)" inputmode="numeric" />
+    <button class="btn-sm" onclick="saveEmergencyContact()">Guardar contacto</button>
+    <button class="btn-sm" id="clearEmergencyBtn" style="display:none;color:var(--danger);border-color:rgba(229,72,77,0.35);" onclick="clearEmergencyContact()">Quitar contacto</button>
+    <div id="emergencyMsg" style="font-size:13px;min-height:16px;"></div>
+  </div>
+
   <div id="profileError" style="color:var(--danger);font-size:13px;min-height:16px;"></div>
   <button class="btn" onclick="saveProfileName()" style="width:260px;">Guardar cambios</button>
   <button class="btn-sm" onclick="openHistory()" style="width:260px;">Mis viajes</button>
@@ -236,6 +246,11 @@
     <div class="row" id="serviceTypeRow" style="gap:8px;">
       <button class="btn btn-sm service-tab active" id="tabMoto" onclick="setServiceType('moto')">🛵 Mototaxi (viajes cortos)</button>
       <button class="btn btn-sm service-tab" id="tabTaxi" onclick="setServiceType('taxi')">🚕 Taxi (viajes largos)</button>
+    </div>
+    <div class="row" id="serviceCategoryRow" style="gap:6px;">
+      <button class="btn btn-sm service-tab active" id="catPasaje" onclick="setServiceCategory('pasaje')">🧍 Pasaje</button>
+      <button class="btn btn-sm service-tab" id="catDomicilio" onclick="setServiceCategory('domicilio')">🍲 Domicilio</button>
+      <button class="btn btn-sm service-tab" id="catMandado" onclick="setServiceCategory('mandado')">📦 Mandado</button>
     </div>
     <div class="hint" id="pickHint">Toca el mapa para marcar dónde te recogemos</div>
     <div class="row">
@@ -299,6 +314,7 @@
   </div>
   <div class="share-cancel-row">
     <button class="btn btn-secondary" id="shareBtn" onclick="shareRide()">📍 Compartir</button>
+    <button class="btn btn-secondary" id="emergencyBtn" style="display:none;" onclick="notifyEmergencyContact()">🚨 Avisar</button>
     <button class="btn btn-secondary" id="cancelBtn" onclick="cancelRide()">Cancelar</button>
   </div>
   <div id="ratingBox" class="card fade-in" style="display:none;">
@@ -433,6 +449,7 @@ const MAX_OCCUPANTS = 4;
 let passengers = 1;
 let children = 0;
 let serviceType = "moto";
+let serviceCategory = "pasaje";
 
 async function fetchRoute(from, to) {
   const url = `https://router.project-osrm.org/route/v1/driving/${from.lng},${from.lat};${to.lng},${to.lat}?overview=full&geometries=geojson`;
@@ -560,6 +577,15 @@ function setServiceType(type) {
   document.getElementById("requestBtn").textContent = type === "taxi" ? "Pedir taxi" : "Pedir mototaxi";
   updateFareEstimate();
   if (map) startAvailableDriversPolling();
+}
+
+// Solo cambia la etiqueta que ve el chofer (qué va a recoger), no el precio
+// — la tarifa sigue siendo la misma fórmula por distancia para los tres.
+function setServiceCategory(category) {
+  serviceCategory = category;
+  document.getElementById("catPasaje").classList.toggle("active", category === "pasaje");
+  document.getElementById("catDomicilio").classList.toggle("active", category === "domicilio");
+  document.getElementById("catMandado").classList.toggle("active", category === "mandado");
 }
 
 function numberedIcon(num, color) {
@@ -780,6 +806,8 @@ async function goToMap() {
   localStorage.setItem("motoya_rider", JSON.stringify({
     id: rider.id, name: rider.name, phone: rider.phone, pin: rider.pin, photo: rider.photo || null,
     home_lat: rider.home_lat ?? null, home_lng: rider.home_lng ?? null, home_label: rider.home_label || null,
+    emergency_contact_name: rider.emergency_contact_name || null,
+    emergency_contact_phone: rider.emergency_contact_phone || null,
   }));
 
   if (rider.isNewPin) {
@@ -882,6 +910,7 @@ async function requestRide() {
       passengers,
       children,
       ride_type: serviceType,
+      service_kind: serviceCategory,
     }),
   });
   ride = await res.json();
@@ -900,6 +929,7 @@ async function requestRide() {
   L.marker([pickup.lat, pickup.lng], { icon: numberedIcon(1, "#f6a623") }).addTo(statusMap);
   if (dest) L.marker([dest.lat, dest.lng], { icon: numberedIcon(2, "#3498db") }).addTo(statusMap);
   startStatusAvailableDriversPolling();
+  updateEmergencyBtn();
 
   connectWs();
   requestWakeLock();
@@ -1175,6 +1205,7 @@ function openProfile() {
   document.getElementById("profilePhone").textContent = rider.phone || "";
   renderProfilePhoto(rider.photo);
   renderHomeStatus(rider);
+  renderEmergencyStatus(rider);
   renderBadgeInto("profileBadge");
   const pinEl = document.getElementById("profilePinValue");
   pinEl.textContent = "••••";
@@ -1380,6 +1411,85 @@ async function saveProfileName() {
   } catch {
     errEl.textContent = "Sin conexión";
   }
+}
+
+function renderEmergencyStatus(rider) {
+  const note = document.getElementById("emergencyContactNote");
+  const clearBtn = document.getElementById("clearEmergencyBtn");
+  const hasContact = !!rider.emergency_contact_phone;
+  note.style.display = hasContact ? "block" : "none";
+  note.textContent = hasContact
+    ? `Guardado${rider.emergency_contact_name ? ": " + rider.emergency_contact_name : ""} · ${rider.emergency_contact_phone}`
+    : "";
+  clearBtn.style.display = hasContact ? "block" : "none";
+  document.getElementById("emergencyNameInput").value = rider.emergency_contact_name || "";
+  document.getElementById("emergencyPhoneInput").value = rider.emergency_contact_phone || "";
+}
+
+function updateEmergencyBtn() {
+  const rider = JSON.parse(localStorage.getItem("motoya_rider") || "null");
+  const btn = document.getElementById("emergencyBtn");
+  btn.style.display = rider && rider.emergency_contact_phone ? "block" : "none";
+}
+
+async function saveEmergencyContact() {
+  const rider = JSON.parse(localStorage.getItem("motoya_rider") || "null");
+  if (!rider) return;
+  const name = document.getElementById("emergencyNameInput").value.trim();
+  const contactPhone = document.getElementById("emergencyPhoneInput").value.trim();
+  const msg = document.getElementById("emergencyMsg");
+  msg.style.color = "var(--text-dim)";
+  msg.textContent = "Guardando...";
+  try {
+    const res = await fetch(API + `/api/riders/${rider.id}/emergency-contact`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phone: rider.phone, pin: rider.pin, name, contactPhone }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "No se pudo guardar");
+    const updated = { ...rider, emergency_contact_name: data.name, emergency_contact_phone: data.contactPhone };
+    localStorage.setItem("motoya_rider", JSON.stringify(updated));
+    renderEmergencyStatus(updated);
+    msg.style.color = "var(--success)";
+    msg.textContent = "✅ Contacto guardado";
+  } catch (e) {
+    msg.style.color = "var(--danger)";
+    msg.textContent = e.message;
+  }
+}
+
+async function clearEmergencyContact() {
+  const rider = JSON.parse(localStorage.getItem("motoya_rider") || "null");
+  if (!rider) return;
+  const msg = document.getElementById("emergencyMsg");
+  msg.style.color = "var(--text-dim)";
+  msg.textContent = "Quitando...";
+  try {
+    const res = await fetch(API + `/api/riders/${rider.id}/emergency-contact`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phone: rider.phone, pin: rider.pin, clear: true }),
+    });
+    if (!res.ok) throw new Error((await res.json()).error || "No se pudo quitar");
+    const updated = { ...rider, emergency_contact_name: null, emergency_contact_phone: null };
+    localStorage.setItem("motoya_rider", JSON.stringify(updated));
+    renderEmergencyStatus(updated);
+    msg.style.color = "var(--success)";
+    msg.textContent = "Contacto quitado";
+  } catch (e) {
+    msg.style.color = "var(--danger)";
+    msg.textContent = e.message;
+  }
+}
+
+function notifyEmergencyContact() {
+  const rider = JSON.parse(localStorage.getItem("motoya_rider") || "null");
+  if (!rider || !rider.emergency_contact_phone || !ride) return;
+  const link = `${location.origin}/seguir.html?id=${ride.id}`;
+  const greeting = rider.emergency_contact_name ? `Hola ${rider.emergency_contact_name}` : "Hola";
+  const text = `${greeting}, voy en un viaje de MotoYa ${resolvedCityLabel}, sígueme en vivo: ${link}`;
+  window.open(waLink(rider.emergency_contact_phone, text), "_blank");
 }
 
 async function changeRiderPin() {
@@ -1601,6 +1711,7 @@ async function restoreActiveRide() {
   L.marker([pickup.lat, pickup.lng], { icon: numberedIcon(1, "#f6a623") }).addTo(statusMap);
   if (dest) L.marker([dest.lat, dest.lng], { icon: numberedIcon(2, "#3498db") }).addTo(statusMap);
   startStatusAvailableDriversPolling();
+  updateEmergencyBtn();
 
   if (fetched.driver) {
     onDriverAssigned(fetched.driver);

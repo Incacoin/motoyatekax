@@ -368,4 +368,29 @@ try {
   // la columna ya existe
 }
 
+// Contacto de emergencia: un botón directo en el viaje activo que manda el
+// link de seguimiento en vivo a este número por WhatsApp, sin pasar por el
+// menú general de compartir cada vez (ver seguir.html / shareRide()).
+try {
+  db.exec("ALTER TABLE riders ADD COLUMN emergency_contact_name TEXT");
+} catch {
+  // la columna ya existe
+}
+try {
+  db.exec("ALTER TABLE riders ADD COLUMN emergency_contact_phone TEXT");
+} catch {
+  // la columna ya existe
+}
+
+// Qué es el viaje, no de qué tamaño (eso ya lo cubre ride_type moto/taxi):
+// 'pasaje' (default, llevar a una persona), 'domicilio' (comida de una
+// fonda) o 'mandado' (hacer una diligencia). Mismo precio para los tres —
+// es solo una etiqueta para que el chofer sepa qué esperar antes de aceptar,
+// no cambia la tarifa por distancia.
+try {
+  db.exec("ALTER TABLE rides ADD COLUMN service_kind TEXT NOT NULL DEFAULT 'pasaje'");
+} catch {
+  // la columna ya existe
+}
+
 module.exports = db;
