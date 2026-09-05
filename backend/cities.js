@@ -5,7 +5,7 @@ const { haversineKm } = require("./geo");
 // de viajes sigue siendo por distancia real (ver MAX_MATCH_DISTANCE_KM), esto
 // es nada más para la marca/etiqueta que ve la persona en pantalla.
 const CITIES = [
-  { id: "tekax", label: "Tekax", lat: 20.2098, lng: -89.462 },
+  { id: "tekax", label: "Tekax", lat: 20.2071, lng: -89.2809 },
   { id: "ticul", label: "Ticul", lat: 20.39528, lng: -89.53389 },
 ];
 
