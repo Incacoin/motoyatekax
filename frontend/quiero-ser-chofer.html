@@ -159,7 +159,7 @@ function tryLocateCity(attempt) {
         .catch(() => showManualCityPicker());
     },
     () => { if (attempt < 1) tryLocateCity(attempt + 1); else showManualCityPicker(); },
-    { maximumAge: 300000, timeout: 15000 }
+    { maximumAge: 300000, timeout: 15000, enableHighAccuracy: true }
   );
 }
 

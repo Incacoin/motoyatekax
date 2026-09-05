@@ -410,7 +410,7 @@ function initCityBrand(attempt) {
         .catch(() => {});
     },
     () => { if (attempt < 1) initCityBrand(attempt + 1); },
-    { maximumAge: 300000, timeout: 15000 }
+    { maximumAge: 300000, timeout: 15000, enableHighAccuracy: true }
   );
 }
 initCityBrand();
