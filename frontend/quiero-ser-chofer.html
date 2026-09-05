@@ -146,7 +146,8 @@ function applyManualCity() {
   applyCityFromDetection(select.value, label);
 }
 
-if (navigator.geolocation) {
+function tryLocateCity(attempt) {
+  attempt = attempt || 0;
   navigator.geolocation.getCurrentPosition(
     (pos) => {
       fetch(`/api/cities/resolve?lat=${pos.coords.latitude}&lng=${pos.coords.longitude}`)
@@ -157,9 +158,13 @@ if (navigator.geolocation) {
         })
         .catch(() => showManualCityPicker());
     },
-    () => showManualCityPicker(),
-    { maximumAge: 300000, timeout: 5000 }
+    () => { if (attempt < 1) tryLocateCity(attempt + 1); else showManualCityPicker(); },
+    { maximumAge: 300000, timeout: 15000 }
   );
+}
+
+if (navigator.geolocation) {
+  tryLocateCity();
 } else {
   showManualCityPicker();
 }

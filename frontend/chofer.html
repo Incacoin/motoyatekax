@@ -319,7 +319,8 @@ function applyCityLabel(label) {
   document.title = "MotoYa " + label + " Chofer";
 }
 
-function initCityBrand() {
+function initCityBrand(attempt) {
+  attempt = attempt || 0;
   if (!navigator.geolocation) return;
   navigator.geolocation.getCurrentPosition(
     (pos) => {
@@ -328,8 +329,8 @@ function initCityBrand() {
         .then((data) => applyCityLabel(data.label))
         .catch(() => {});
     },
-    () => {},
-    { maximumAge: 300000, timeout: 5000 }
+    () => { if (attempt < 1) initCityBrand(attempt + 1); },
+    { maximumAge: 300000, timeout: 15000 }
   );
 }
 initCityBrand();
